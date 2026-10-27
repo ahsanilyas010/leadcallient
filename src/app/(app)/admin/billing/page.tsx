@@ -10,8 +10,9 @@ import { stripeConfigured } from "@/lib/billing/stripe";
 import { bankTransferDetails } from "@/lib/billing/bank-transfer";
 import { FREE_AGENT_SEATS, SELF_SERVE_MAX_AGENTS } from "@/lib/plan";
 import { ManageBillingButton, SeatPicker } from "./seat-picker";
+import { ContactCard } from "./contact-card";
 
-export const metadata: Metadata = { title: "Plan & billing" };
+export const metadata: Metadata = { title: "Agents & billing" };
 
 export default async function BillingPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const profile = await requireProfile();
@@ -26,6 +27,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   // just "offline" rather than a special in-memory-only mode.
   const mode = stripeConfigured() ? "stripe" : "offline";
   const bank = bankTransferDetails();
+  // No payment provider: there is no self-serve price list to show. The page
+  // keeps the seat count and says how to reach us to add agents.
+  const selfServe = mode === "stripe";
 
   return (
     <div className="space-y-4 p-4">
@@ -40,12 +44,14 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.4fr]">
         <div className="rounded-3xl bg-white p-6 ring-1 ring-line sm:p-8">
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-blue">Current plan</div>
-          <h1 className="mt-2 font-display text-3xl font-semibold text-ink">{paid ? "Paid" : "Free"}</h1>
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-blue">{selfServe ? "Current plan" : "Your workspace"}</div>
+          <h1 className="mt-2 font-display text-3xl font-semibold text-ink">{selfServe ? (paid ? "Paid" : "Free") : workspace.name}</h1>
           <p className="mt-1 text-sm text-muted">
-            {paid
-              ? `${workspace.agentSeats} agent seats, billed monthly`
-              : `${FREE_AGENT_SEATS} agents included, free forever`}
+            {selfServe
+              ? paid
+                ? `${workspace.agentSeats} agent seats, billed monthly`
+                : `${FREE_AGENT_SEATS} agents included, free forever`
+              : `${workspace.agentSeats} agent seat${workspace.agentSeats === 1 ? "" : "s"} on this workspace`}
           </p>
           {workspace.billingStatus === "past_due" && (
             <p className="mt-3 rounded-xl bg-danger-tint px-3 py-2 text-xs text-danger">Your last payment failed. Update your card to keep your seats.</p>
@@ -65,7 +71,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
             </div>
             <p className="mt-2 text-xs text-muted">
               {used >= workspace.agentSeats
-                ? "All seats are in use. Add seats to create more agents."
+                ? selfServe
+                  ? "All seats are in use. Add seats to create more agents."
+                  : "All seats are in use. Contact us to add more agents."
                 : `${workspace.agentSeats - used} more agent${workspace.agentSeats - used === 1 ? "" : "s"} can be added.`}
             </p>
           </div>
@@ -85,13 +93,15 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
               download invoices. Changes are prorated on your next bill.
             </p>
           </div>
-        ) : (
+        ) : selfServe ? (
           <SeatPicker
             min={Math.max(FREE_AGENT_SEATS + 1, used, paid ? workspace.agentSeats : 0)}
             max={SELF_SERVE_MAX_AGENTS}
             initial={Math.max(10, used + 1)}
             mode={mode}
           />
+        ) : (
+          <ContactCard workspaceName={workspace.name} />
         )}
       </div>
 

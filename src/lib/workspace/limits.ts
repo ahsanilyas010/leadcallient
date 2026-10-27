@@ -17,5 +17,5 @@ export async function activeAgentCount(supabase: SupabaseClient<RealDatabase>, w
 }
 
 export function seatLimitMessage(seats: number) {
-  return `Your plan includes ${seats} agent${seats === 1 ? "" : "s"}, and they're all in use. Add seats under Plan & billing to create more agents.`;
+  return `Your plan includes ${seats} agent${seats === 1 ? "" : "s"}, and they're all in use. Add more under Agents & billing to create more agents.`;
 }

@@ -37,7 +37,10 @@ export type QueueReason = {
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export function diagnoseQueue(d: QueueDiagnosisRow): QueueReason {
-  if (d.rostered_campaigns === 0) {
+  // Leads assigned to the agent outside any campaign (their own list) are
+  // counted in leads_considered, so a campaign problem is only the answer
+  // when there is nothing else to dial either.
+  if (d.rostered_campaigns === 0 && d.leads_considered === 0) {
     return {
       title: "You are not on any campaign yet",
       detail: "Leads are only served from campaigns you are on the roster of.",
@@ -45,7 +48,7 @@ export function diagnoseQueue(d: QueueDiagnosisRow): QueueReason {
       askManager: true,
     };
   }
-  if (d.in_window_campaigns === 0) {
+  if (d.in_window_campaigns === 0 && d.leads_considered === 0) {
     if (d.active_campaigns === 0) {
       return {
         title: "Your campaigns are paused",
@@ -65,8 +68,8 @@ export function diagnoseQueue(d: QueueDiagnosisRow): QueueReason {
   }
   if (d.leads_in_rostered_campaigns === 0) {
     return {
-      title: "Your campaigns have no leads",
-      detail: "Nothing has been uploaded to the campaigns you are on.",
+      title: "Nothing to dial yet",
+      detail: "Nothing has been uploaded to the campaigns you are on, and no leads are assigned to you.",
       fix: { href: "/admin/import", label: "Upload leads" },
       askManager: true,
     };

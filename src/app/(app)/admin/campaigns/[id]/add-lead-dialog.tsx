@@ -36,10 +36,12 @@ export function AddLeadDialog({
   campaignId,
   campaignCountry,
   agents,
+  screeningRequired = false,
 }: {
   campaignId: string;
   campaignCountry: string | null;
   agents: { id: string; name: string }[];
+  screeningRequired?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(createManualLead, initialState);
@@ -63,8 +65,9 @@ export function AddLeadDialog({
         <DialogHeader>
           <DialogTitle>Add lead</DialogTitle>
           <DialogDescription>
-            The number is checked against the suppression list and this campaign&rsquo;s existing leads. The lead is
-            not dialable until it has been screened. Leave the phone blank to save a contact that still needs a number.
+            The number is checked against the suppression list and this campaign&rsquo;s existing leads.{" "}
+            {screeningRequired ? "The lead is not dialable until it has been screened. " : ""}
+            Leave the phone blank to save a contact that still needs a number.
           </DialogDescription>
         </DialogHeader>
         <form action={formAction} className="flex flex-col gap-3">

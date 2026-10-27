@@ -13,7 +13,9 @@ export interface ClientPortalData {
 // Every field here comes from a SECURITY DEFINER function scoped to the
 // caller's own client_id (migration 00000000000064) — this action is a
 // thin wrapper, not where the access boundary actually lives.
-export async function getClientPortalData(anonymize: boolean, clientId?: string): Promise<ClientPortalData> {
+// campaignId narrows every section to one campaign (migration 114); omitted
+// means every campaign of the client.
+export async function getClientPortalData(anonymize: boolean, clientId?: string, campaignId?: string): Promise<ClientPortalData> {
   const profile = await requireRealProfile();
   const supabase = await createRealClient();
 
@@ -21,7 +23,11 @@ export async function getClientPortalData(anonymize: boolean, clientId?: string)
   // gets their own (the client_* functions scope by my_client_id()).
   if (profile.role === "super_admin" || profile.role === "ops_manager") {
     if (!clientId) return { funnel: [], outcomes: [], activity: [] };
-    const { data, error } = await supabase.rpc("manager_client_report", { p_client_id: clientId, p_anonymize: anonymize });
+    const { data, error } = await supabase.rpc("manager_client_report", {
+      p_client_id: clientId,
+      p_anonymize: anonymize,
+      p_campaign_id: campaignId || undefined,
+    });
     if (error) throw new Error(error.message);
     const report = data as unknown as ClientPortalData;
     return { funnel: report.funnel ?? [], outcomes: report.outcomes ?? [], activity: report.activity ?? [] };
@@ -30,25 +36,29 @@ export async function getClientPortalData(anonymize: boolean, clientId?: string)
 
   const [{ data: funnel }, { data: outcomes }, { data: activity }] = await Promise.all([
     supabase.rpc("client_campaign_funnel"),
-    supabase.rpc("client_disposition_breakdown"),
-    supabase.rpc("client_agent_activity", { p_anonymize: anonymize }),
+    supabase.rpc("client_disposition_breakdown", { p_campaign_id: campaignId || undefined }),
+    supabase.rpc("client_agent_activity", { p_anonymize: anonymize, p_campaign_id: campaignId || undefined }),
   ]);
 
-  return { funnel: funnel ?? [], outcomes: outcomes ?? [], activity: activity ?? [] };
+  return {
+    funnel: (funnel ?? []).filter((f) => !campaignId || f.campaign_id === campaignId),
+    outcomes: outcomes ?? [],
+    activity: activity ?? [],
+  };
 }
 
 // Spec: "monthly PDF report generated server-side and stored in Storage."
 // Generates on demand rather than only on a schedule — a client can
 // always get this month's report immediately instead of waiting for a
 // cron job neither of us can verify runs in this environment.
-export async function generateMonthlyReport(clientId?: string): Promise<{ error?: string; path?: string }> {
+export async function generateMonthlyReport(clientId?: string, campaignId?: string): Promise<{ error?: string; path?: string }> {
   const profile = await requireRealProfile();
   if (profile.role !== "client" && profile.role !== "super_admin" && profile.role !== "ops_manager") {
     return { error: "Not authorized." };
   }
 
   const { renderClientReportPdf } = await import("@/lib/reports/client-report-pdf-v2");
-  const data = await getClientPortalData(profile.role === "client", clientId);
+  const data = await getClientPortalData(profile.role === "client", clientId, campaignId);
 
   const pdfBuffer = await renderClientReportPdf({
     monthLabel: new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),

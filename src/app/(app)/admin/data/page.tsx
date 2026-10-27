@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Upload } from "lucide-react";
 import { EmptyState } from "@/components/guide/empty-state";
 import { requireProfile } from "@/lib/auth/current-profile";
+import { getCurrentWorkspace } from "@/lib/workspace/current";
 import { createRealClient } from "@/lib/supabase/real";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,6 +26,7 @@ export default async function DataPage() {
 
   const supabase = await createRealClient();
   const ws = profile.workspace_id;
+  const workspace = await getCurrentWorkspace();
   const [
     { data: sources },
     { data: campaigns },
@@ -95,7 +97,8 @@ export default async function DataPage() {
                   </Link>
                 }
               >
-                Upload a CSV or Excel file with one lead per row, then match its columns to Name, Phone number, Company and Email. Screen the batch under Compliance so leads can be dialled.
+                Upload a CSV or Excel file with one lead per row, then match its columns to Name, Phone number, Company and Email.
+                {workspace.require_screening ? " Screen the batch under Compliance so leads can be dialled." : " Assign the leads to agents under Leads and they are ready to dial."}
               </EmptyState>
             </div>
           )}
@@ -108,6 +111,7 @@ export default async function DataPage() {
                 <LeadImporterDialog
                   label="Import vendor file"
                   isManager
+                  screeningRequired={workspace.require_screening}
                   campaigns={campaigns ?? []}
                   dataSources={activeSources.map((d) => ({ id: d.id, name: d.name, needsReview: d.lawful_basis === "unspecified" }))}
                 />

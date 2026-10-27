@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireRole } from "@/lib/auth/current-profile";
+import { getCurrentWorkspace } from "@/lib/workspace/current";
+import { LeadImporterDialog } from "@/components/leads/lead-importer";
 import { createRealClient } from "@/lib/supabase/real";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,6 +27,8 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   const { id } = await params;
   const profile = await requireRole(["super_admin", "ops_manager"]);
   const ws = profile.workspace_id;
+  const workspace = await getCurrentWorkspace();
+  const screeningRequired = workspace.require_screening;
 
   const supabase = await createRealClient();
   const { data: campaign } = await supabase
@@ -43,6 +47,8 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
     { data: templates },
     { data: contacts },
     { data: clients },
+    { data: allCampaigns },
+    { data: sources },
   ] = await Promise.all([
     supabase
       .from("leads")
@@ -67,6 +73,8 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
       .is("promoted_lead_id", null)
       .order("created_at", { ascending: false }),
     supabase.from("clients").select("id, name").eq("workspace_id", ws).order("name"),
+    supabase.from("campaigns").select("id, name, country").eq("workspace_id", ws).order("name"),
+    supabase.from("data_sources").select("id, name, lawful_basis").eq("workspace_id", ws).eq("is_active", true).order("name"),
   ]);
 
   const nameById = new Map((people ?? []).map((p) => [p.id, p.full_name]));
@@ -150,19 +158,24 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         <TabsContent value="leads">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted">
-              Showing {(leads ?? []).length} of {leadTotal ?? 0}. Bring in a whole file with{" "}
-              <Link href="/admin/import" className="text-brand-blue hover:underline">
-                Upload leads
-              </Link>
-              , or see every column and assign in bulk under{" "}
+              Showing {(leads ?? []).length} of {leadTotal ?? 0}. Upload a file straight into this campaign, or see every column and
+              assign in bulk under{" "}
               <Link href={`/admin/leads?campaign=${campaign.id}`} className="text-brand-blue hover:underline">
                 Leads
               </Link>
               .
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <LeadImporterDialog
+                label="Upload a file"
+                isManager
+                screeningRequired={screeningRequired}
+                initialCampaignId={campaign.id}
+                campaigns={allCampaigns ?? []}
+                dataSources={(sources ?? []).map((s) => ({ id: s.id, name: s.name, needsReview: s.lawful_basis === "unspecified" }))}
+              />
               <AutoAssignButton campaignId={campaign.id} />
-              <AddLeadDialog campaignId={campaign.id} campaignCountry={campaign.country} agents={assignedAgents} />
+              <AddLeadDialog campaignId={campaign.id} campaignCountry={campaign.country} agents={assignedAgents} screeningRequired={screeningRequired} />
             </div>
           </div>
 
@@ -237,7 +250,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                 {(leads ?? []).length === 0 && (
                   <tr>
                     <td colSpan={10} className="px-3 py-8 text-center text-sm text-muted">
-                      No leads yet. Add one, upload a file under Upload leads, or post to the inbound webhook.
+                      No leads yet. Upload a file, add one by hand, or post to the inbound webhook.
                     </td>
                   </tr>
                 )}
@@ -246,8 +259,10 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           </TableWrap>
 
           <p className="mt-3 text-[11px] text-muted">
-            A lead becomes dialable once it has passed screening and the campaign is live. Assigned leads are served only
-            to their agent; unassigned leads stay in the shared pool for the campaign roster.
+            {screeningRequired
+              ? "A lead becomes dialable once it has passed screening and the campaign is live."
+              : "A lead is dialable as soon as the campaign is live (screening is optional in this workspace)."}{" "}
+            Assigned leads are served only to their agent; unassigned leads stay in the shared pool for the campaign roster.
           </p>
         </TabsContent>
 
@@ -285,7 +300,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           </TableWrap>
           <p className="mt-3 text-[11px] text-muted">
             The assigned agent adds a number from the Call sheet; it is then checked against suppression and enters the lead
-            list as unscreened.
+            list{screeningRequired ? " as unscreened" : ""}.
           </p>
         </TabsContent>
 

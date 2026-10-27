@@ -25,10 +25,10 @@ Product of **Assorted Business LLC** (name, address and contact details live in
 | Compliance | `/admin/compliance` | Suppression list, screening, DNC stats |
 | Data | `/admin/data` | Data sources with lawful basis, vendor CSV/XLSX import, source performance, phone-less contacts |
 | Quality | `/quality` | QA scorecards, agent acknowledgement |
-| Client reports | `/portal` | Client login sees own results; admins preview any client |
+| Client reports | `/portal` | Client login sees own results; admins preview any client; filter by campaign and outcome group, PDF per campaign |
 | Integrations / Settings | `/admin/integrations`, `/admin/settings/*` | Zoom, email templates, branding, lead upload |
 | Security & audit | `/admin/security` | Audit log, recent sign-ins, credential events |
-| Billing | `/admin/billing` | Seats and Stripe checkout/portal |
+| Agents & billing | `/admin/billing` | Seats in use; Stripe checkout/portal when Stripe is configured, otherwise a contact card (phone / WhatsApp / email from `NEXT_PUBLIC_COMPANY_*`) and bank-transfer details |
 | Platform owner | `/platform` | Vendor-side workspace list and suspension |
 
 Roles: `super_admin`, `ops_manager`, `team_lead`, `agent`, `qa_analyst`,
@@ -187,19 +187,25 @@ data source with a lawful basis). Steps: **1** pick a .csv/.xlsx (max 10 MB, 20,
 - **Review** shows counts for rows that will import, invalid numbers (row + reason), repeats in the file,
   numbers already in the workspace and suppressed numbers (skipped), plus a sample of the cleaned result.
   Suppressed numbers are never imported; leads always arrive `pending`.
-- **Screening** is a deliberate, manager-only step, off by default. "Run screening now" runs the manual
-  check (`screen_lead_batch`): numbers are checked against the workspace suppression list only; it is not a
-  live TPS/DNC lookup. Lead gen cannot screen or roster. Compliance always offers a Screen button per batch
-  (with its pending count) plus "Screen N pending leads" for everything still waiting, including leads
-  added outside a batch (`screen_leads`).
+- **Screening is optional.** Compliance has a "Require screening before dialing" switch
+  (`workspaces.require_screening`, migration 113, off by default). Off: a lead can be dialled as soon as it is
+  uploaded and assigned; the suppression list still blocks numbers. On: every lead must pass screening first,
+  for markets that need a TPS/DNC-style check before each call. "Run screening now" runs the manual check
+  (`screen_lead_batch`): numbers are checked against the workspace suppression list only; it is not a live
+  TPS/DNC lookup. Lead gen cannot screen or roster. Compliance always offers a Screen button per batch (with
+  its pending count) plus "Screen N pending leads" for everything still waiting, including leads added
+  outside a batch (`screen_leads`).
 - **Assigning.** Under Leads (or a campaign's lead table) an admin can assign any lead or contact to an
   agent, screened or not; assignment also puts the agent on that campaign's roster, which the dial queue,
-  call sheet and lead RLS all require. The lead still becomes dialable only once screened.
+  call sheet and lead RLS all require. A lead that belongs to no campaign is a personal list: the agent it is
+  assigned to can dial it from the call sheet, and the dial queue serves it after campaign leads (campaign
+  defaults apply: 6 attempts, 24 h cooling-off, no calling window).
 - **Dialing your own data.** Tick "I will call these myself": the leads are assigned to you and you are put
-  on that campaign's roster (migration 99 lets super admins and ops managers be rostered). With screening
-  done, **Start dialing** opens `/dial`, which behaves exactly as for an agent. A lead is dialable only if it
-  is screened, on a campaign you are rostered on and assigned to you or to nobody. The demo workspace only
-  dials its allow-listed numbers by design.
+  on that campaign's roster (migration 99 lets super admins and ops managers be rostered). **Start dialing**
+  opens `/dial`, which behaves exactly as for an agent. A lead is dialable if it is on a campaign you are
+  rostered on (or assigned to you with no campaign), assigned to you or to nobody, not suppressed and, when
+  the workspace requires it, screened. A campaign's own page has an "Upload a file" button that opens the
+  importer with that campaign chosen. The demo workspace only dials its allow-listed numbers by design.
 - Agents can edit next step, appointment, website and contact person on their own leads
   (`update_my_lead`, optional `p_extra`).
 

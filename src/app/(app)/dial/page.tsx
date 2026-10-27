@@ -26,6 +26,7 @@ export default async function DialWorkspacePage() {
       dispositions={dispositions}
       initialDueCallbacks={dueCallbacks}
       isDemo={workspace.is_demo}
+      screeningRequired={workspace.require_screening}
       canManage={profile.role === "super_admin" || profile.role === "ops_manager"}
     />
   );

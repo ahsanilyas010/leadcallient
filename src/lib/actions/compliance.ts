@@ -180,3 +180,16 @@ export async function screenAllPending(): Promise<ScreenAllResult> {
   revalidatePath("/dial");
   return { ok: true, screened, batches: batchIds.length };
 }
+
+// Screening before dialing is a workspace choice (migration 113). Off: leads
+// can be dialled as soon as they are uploaded and assigned; the suppression
+// list still blocks. On: every lead must pass screening first.
+export async function setRequireScreening(on: boolean): Promise<ActionResult> {
+  const profile = await requireRealProfile();
+  if (!["super_admin", "ops_manager"].includes(profile.role)) return { error: "Only an admin or ops manager can change this." };
+  const supabase = await createRealClient();
+  const { error } = await supabase.from("workspaces").update({ require_screening: on }).eq("id", profile.workspace_id);
+  if (error) return { error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}

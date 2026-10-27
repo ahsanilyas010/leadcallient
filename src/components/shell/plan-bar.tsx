@@ -16,7 +16,8 @@ export interface PlanInfo {
   // real customer, and never the legacy sales-demo (which renders DemoBar
   // instead of this component entirely).
   isRealDemo?: boolean;
-  // False when no payment provider is configured: show "Contact sales", not a dead-end Upgrade.
+  // False when no payment provider is configured: there is no self-serve plan to
+  // show, so the bar offers "Contact us" (phone / WhatsApp) instead of Upgrade.
   billingReady?: boolean;
 }
 
@@ -32,7 +33,7 @@ export function PlanBar({ info }: { info: PlanInfo }) {
       <div className="flex min-w-0 items-center gap-1.5">
         <Building2 className="h-3.5 w-3.5 shrink-0 text-gold-soft" />
         <span className="truncate font-medium">{info.workspaceName}</span>
-        <span className="hidden text-white/60 sm:inline">· {info.plan === "free" ? "Free plan" : "Paid plan"}</span>
+        {info.billingReady !== false && <span className="hidden text-white/60 sm:inline">· {info.plan === "free" ? "Free plan" : "Paid plan"}</span>}
         {info.isRealDemo && <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">Demo mode</span>}
       </div>
       <div className="flex shrink-0 items-center gap-2">
@@ -54,7 +55,7 @@ export function PlanBar({ info }: { info: PlanInfo }) {
             className="inline-flex items-center gap-1 rounded-md bg-gold-gradient px-2 py-0.5 font-semibold text-ink hover:brightness-105"
           >
             <Sparkles className="h-3 w-3" />{" "}
-            {info.plan !== "free" ? "Billing" : info.billingReady === false ? "Contact sales" : "Upgrade"}
+            {info.plan !== "free" ? "Billing" : info.billingReady === false ? "Contact us" : "Upgrade"}
           </Link>
         )}
       </div>

@@ -64,7 +64,7 @@ export const NAV: NavItem[] = [
   { href: "/admin/integrations", label: "Integrations", icon: "PlugZap", roles: MANAGERS },
   { href: "/admin/settings/branding", label: "Settings", icon: "Settings", roles: MANAGERS },
   { href: "/admin/security", label: "Security & audit", icon: "Lock", roles: ["super_admin"] },
-  { href: "/admin/billing", label: "Plan & billing", icon: "CreditCard", roles: ["super_admin"] },
+  { href: "/admin/billing", label: "Agents & billing", icon: "CreditCard", roles: ["super_admin"] },
 ];
 
 export function navFor(role: AppRole): NavItem[] {

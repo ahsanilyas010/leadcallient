@@ -24,9 +24,11 @@ export const BRAND = {
 };
 
 // The company behind the product, shown on the contact page, in the site
-// footer and on the sign-in page. Leave a field empty ("") and it is simply
-// not shown. Set NEXT_PUBLIC_COMPANY_PHONE, NEXT_PUBLIC_COMPANY_EMAIL and
-// NEXT_PUBLIC_COMPANY_WHATSAPP_URL (see .env.example) when they're ready.
+// footer, on Agents & billing and on the sign-in page. The phone and WhatsApp
+// defaults are Assorted Business's sales number; NEXT_PUBLIC_COMPANY_PHONE,
+// NEXT_PUBLIC_COMPANY_EMAIL and NEXT_PUBLIC_COMPANY_WHATSAPP_URL (see
+// .env.example) override them. Set a variable to an empty string to hide
+// that contact method.
 export const COMPANY = {
   legalName: "Assorted Business LLC",
   country: "United States",
@@ -37,11 +39,10 @@ export const COMPANY = {
     postalCode: "07840",
     countryCode: "US",
   },
-  phone: process.env.NEXT_PUBLIC_COMPANY_PHONE ?? "", // e.g. "+1 555 010 0000"
+  phone: process.env.NEXT_PUBLIC_COMPANY_PHONE ?? "+92 321 8526405",
   email: process.env.NEXT_PUBLIC_COMPANY_EMAIL ?? "", // e.g. "hello@leadcallient.com"
-  // WhatsApp chat link, e.g. "https://wa.me/15550100000". Until it's set the
-  // contact page shows the button as "coming soon".
-  whatsappUrl: process.env.NEXT_PUBLIC_COMPANY_WHATSAPP_URL ?? "",
+  // WhatsApp chat link for the same number ("https://wa.me/<digits>").
+  whatsappUrl: process.env.NEXT_PUBLIC_COMPANY_WHATSAPP_URL ?? "https://wa.me/923218526405",
 };
 
 // "470 Schooleys Mountain Rd, Hackettstown, NJ 07840, US"
