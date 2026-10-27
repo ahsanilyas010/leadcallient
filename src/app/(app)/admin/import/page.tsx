@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/current-profile";
+import { getCurrentWorkspace } from "@/lib/workspace/current";
 import { createRealClient } from "@/lib/supabase/real";
 import { LeadImporter } from "@/components/leads/lead-importer";
 import { ScreenButton } from "@/components/leads/screen-button";
@@ -13,6 +14,7 @@ export default async function ImportLeadsPage() {
   const profile = await requireRole(["super_admin", "ops_manager"]);
   const supabase = await createRealClient();
   const ws = profile.workspace_id;
+  const workspace = await getCurrentWorkspace();
 
   const [{ data: campaigns }, { data: sources }, { data: batches }] = await Promise.all([
     supabase.from("campaigns").select("id, name, country").eq("workspace_id", ws).order("name"),
@@ -55,6 +57,7 @@ export default async function ImportLeadsPage() {
         <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
           <LeadImporter
             isManager
+            screeningRequired={workspace.require_screening}
             campaigns={campaigns ?? []}
             dataSources={(sources ?? []).map((s) => ({ id: s.id, name: s.name, needsReview: s.lawful_basis === "unspecified" }))}
           />

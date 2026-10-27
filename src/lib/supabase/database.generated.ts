@@ -2298,6 +2298,7 @@ export type Database = {
           name: string
           onboarding_step: string | null
           plan: Database["public"]["Enums"]["workspace_plan"]
+          require_screening: boolean
           seat_limit: number
           signup: Json
           slug: string
@@ -2319,6 +2320,7 @@ export type Database = {
           name: string
           onboarding_step?: string | null
           plan?: Database["public"]["Enums"]["workspace_plan"]
+          require_screening?: boolean
           seat_limit?: number
           signup?: Json
           slug: string
@@ -2340,6 +2342,7 @@ export type Database = {
           name?: string
           onboarding_step?: string | null
           plan?: Database["public"]["Enums"]["workspace_plan"]
+          require_screening?: boolean
           seat_limit?: number
           signup?: Json
           slug?: string
@@ -2763,7 +2766,7 @@ export type Database = {
         Returns: undefined
       }
       client_agent_activity: {
-        Args: { p_anonymize?: boolean }
+        Args: { p_anonymize?: boolean; p_campaign_id?: string }
         Returns: {
           agent_label: string
           calls: number
@@ -2784,7 +2787,7 @@ export type Database = {
         }[]
       }
       client_disposition_breakdown: {
-        Args: never
+        Args: { p_campaign_id?: string }
         Returns: {
           count: number
           disposition_label: string
@@ -2917,7 +2920,7 @@ export type Database = {
         }[]
       }
       manager_client_report: {
-        Args: { p_anonymize?: boolean; p_client_id: string }
+        Args: { p_anonymize?: boolean; p_campaign_id?: string; p_client_id: string }
         Returns: Json
       }
       mark_onboarding_step: {

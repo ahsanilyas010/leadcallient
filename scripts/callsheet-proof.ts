@@ -47,10 +47,13 @@ async function main() {
   const { data: zz } = await svc.from("profiles").select("id, email, workspace_id").like("email", "zz-signup-%").limit(1).single();
   if (!zz) throw new Error("ZZ Signup Test Co owner not found");
   const wsId = zz.workspace_id;
-  const { data: ws } = await svc.from("workspaces").select("status, is_demo").eq("id", wsId).single();
+  const { data: ws } = await svc.from("workspaces").select("status, is_demo, require_screening").eq("id", wsId).single();
   if (!ws || ws.is_demo) throw new Error("expected a non-demo ZZ workspace");
   const originalStatus = ws.status;
-  await svc.from("workspaces").update({ status: "active" }).eq("id", wsId);
+  // The "Not screened yet" assertions below describe the gate with screening
+  // required (migration 113 made it optional per workspace); restored at the end.
+  const originalRequireScreening = ws?.require_screening ?? false;
+  await svc.from("workspaces").update({ status: "active", require_screening: true }).eq("id", wsId);
 
   const tag = `cs-${Date.now()}`;
   const stamp = String(Date.now()).slice(-6);
@@ -207,7 +210,7 @@ async function main() {
       if (created.supp.length) await svc.from("suppression_list").delete().in("id", created.supp);
       if (created.users.length) await svc.from("profiles").delete().in("id", created.users);
       for (const u of created.users) await svc.auth.admin.deleteUser(u);
-      await svc.from("workspaces").update({ status: originalStatus }).eq("id", wsId);
+      await svc.from("workspaces").update({ status: originalStatus, require_screening: originalRequireScreening }).eq("id", wsId);
       const { count } = await svc.from("leads").select("id", { count: "exact", head: true }).eq("workspace_id", wsId);
       console.log(`  ZZ workspace restored to '${originalStatus}'; leads left in it: ${count}`);
     } catch (e) {

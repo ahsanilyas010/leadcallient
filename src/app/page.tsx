@@ -86,7 +86,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "How much does it cost to start?",
-    a: `Every workspace starts free with ${FREE_AGENT_SEATS} agents, and admins, managers, team leads and QA are always free. When you need more agents, your admin adds seats from Plan & billing. Call minutes are billed by Zoom to your own Zoom Phone account, not by LeadCallient.`,
+    a: `Every workspace starts free with ${FREE_AGENT_SEATS} agents, and admins, managers, team leads and QA are always free. When you need more agents, your admin adds them under Agents & billing. Call minutes are billed by Zoom to your own Zoom Phone account, not by LeadCallient.`,
   },
   {
     q: "Is the demo using real data?",

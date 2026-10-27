@@ -52,6 +52,11 @@ interface Props {
   // Managers (super_admin / ops_manager) get the dial-it-myself and
   // screen-now options. Lead gen never sees them.
   isManager: boolean;
+  // Whether this workspace makes leads pass screening before they can be
+  // dialled (Compliance). Off: imported leads are dialable straight away.
+  screeningRequired?: boolean;
+  // Pre-select a campaign (the importer on a campaign's own page).
+  initialCampaignId?: string;
   onFinished?: () => void;
 }
 
@@ -94,14 +99,14 @@ async function readHead(file: File): Promise<FirstRowsPreview> {
   return { headers, rows };
 }
 
-export function LeadImporter({ campaigns, dataSources, isManager, onFinished }: Props) {
+export function LeadImporter({ campaigns, dataSources, isManager, screeningRequired = false, initialCampaignId, onFinished }: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [head, setHead] = useState<FirstRowsPreview | null>(null);
-  const [campaignId, setCampaignId] = useState("");
+  const [campaignId, setCampaignId] = useState(initialCampaignId ?? "");
   const [dataSourceId, setDataSourceId] = useState("");
   // One role per column of the file (the mapping step), plus the first
   // guess, so a column can say "suggested, please check".
@@ -112,7 +117,7 @@ export function LeadImporter({ campaigns, dataSources, isManager, onFinished }: 
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [callMyself, setCallMyself] = useState(false);
-  const [screenNow, setScreenNow] = useState(false);
+  const [screenNow, setScreenNow] = useState(screeningRequired);
   const [done, setDone] = useState<Extract<ImportResponse, { ok: true }> | null>(null);
   const [screenedLater, setScreenedLater] = useState(0);
   const [pending, startTransition] = useTransition();
@@ -264,7 +269,7 @@ export function LeadImporter({ campaigns, dataSources, isManager, onFinished }: 
     setDone(null);
     setScreenedLater(0);
     setCallMyself(false);
-    setScreenNow(false);
+    setScreenNow(screeningRequired);
     setError(null);
     setRoles({});
     setSuggestedRoles({});
@@ -665,9 +670,11 @@ export function LeadImporter({ campaigns, dataSources, isManager, onFinished }: 
                 <span>
                   <span className="font-medium">Run screening now</span>
                   <span className="block text-xs text-muted">
-                    Leads can only be dialled after screening. This runs the manual screening check on this batch: it checks the numbers
-                    against your workspace suppression list only. It is not a live TPS or National DNC lookup. Off by default, because
-                    screening is a deliberate compliance step.
+                    {screeningRequired
+                      ? "Your workspace requires screening before dialing, so these leads can only be dialled after this runs. "
+                      : "Optional: screening is not required in your workspace, so these leads can be dialled either way. "}
+                    This runs the manual screening check on this batch: it checks the numbers against your workspace suppression list
+                    only. It is not a live TPS or National DNC lookup.
                   </span>
                 </span>
               </label>
@@ -730,7 +737,7 @@ export function LeadImporter({ campaigns, dataSources, isManager, onFinished }: 
             )}
           </ul>
 
-          {isManager && done.result.imported > 0 && done.result.screened + screenedLater === 0 && (
+          {isManager && screeningRequired && done.result.imported > 0 && done.result.screened + screenedLater === 0 && (
             <div className="rounded-lg border border-gold/40 bg-gold-tint px-3 py-2 text-sm text-ink">
               These leads are <strong>pending screening</strong>, so nobody can dial them yet.
               <div className="mt-2">
@@ -742,7 +749,11 @@ export function LeadImporter({ campaigns, dataSources, isManager, onFinished }: 
             </div>
           )}
           {!isManager && (
-            <p className="text-sm text-muted">The leads are in your inbox. A manager screens them before they can be dialled.</p>
+            <p className="text-sm text-muted">
+              {screeningRequired
+                ? "The leads are in your inbox. A manager screens them before they can be dialled."
+                : "The leads are in your inbox, ready to be assigned to an agent."}
+            </p>
           )}
 
           <div className="flex flex-wrap gap-2">

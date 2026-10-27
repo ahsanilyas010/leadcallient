@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { EmptyState } from "@/components/guide/empty-state";
 import { requireProfile } from "@/lib/auth/current-profile";
+import { getCurrentWorkspace } from "@/lib/workspace/current";
 import { createRealClient } from "@/lib/supabase/real";
 import { SUPPRESSION_REASONS } from "@/lib/compliance/reasons";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AddSuppressionDialog } from "./add-suppression-dialog";
 import { RunScreeningDialog } from "./run-screening-dialog";
 import { ScreenAllButton } from "./screen-all-button";
+import { ScreeningModeCard } from "./screening-mode-card";
 import { RemoveSuppressionButton } from "./remove-suppression-button";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 
@@ -25,6 +27,8 @@ export default async function CompliancePage() {
 
   const supabase = await createRealClient();
   const ws = profile.workspace_id;
+  const workspace = await getCurrentWorkspace();
+  const screeningRequired = workspace.require_screening;
 
   const [{ data: stats }, { data: entries }, { data: batches }, { data: campaigns }, { data: pendingLeads }] = await Promise.all([
     supabase.from("v_compliance_stats").select("*").eq("workspace_id", ws).maybeSingle(),
@@ -82,7 +86,8 @@ export default async function CompliancePage() {
 
   return (
     <div className="p-4">
-      {nothingScreened && (
+      <ScreeningModeCard required={screeningRequired} canManage={canManage} />
+      {nothingScreened && screeningRequired && (
         <div className="mb-4">
           <EmptyState
             testId="compliance-empty"
@@ -99,7 +104,8 @@ export default async function CompliancePage() {
               ) : undefined
             }
           >
-            Screening checks each lead&apos;s number against do-not-call rules and your suppression list. Only leads that pass can be dialled.
+            Screening checks each lead&apos;s number against do-not-call rules and your suppression list. Only leads that pass can be dialled
+            while screening is required.
             {waiting > 0 ? " Use the Screen button in Screening history below." : " Upload some leads, then screen them here."}
           </EmptyState>
         </div>

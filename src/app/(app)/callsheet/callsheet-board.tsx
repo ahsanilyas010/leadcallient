@@ -219,7 +219,7 @@ export function CallSheetBoard({
         {items.length === 0 ? (
           <div className="cs-empty">
             <strong>Nothing on your call sheet yet</strong>
-            Leads appear here once they are assigned to you or sit on a campaign you are on. Ask your manager to upload and screen a list.
+            Leads appear here once they are assigned to you or sit on a campaign you are on. Ask your manager to upload a list and assign it to you.
           </div>
         ) : visible.length === 0 ? (
           <div className="cs-empty">

@@ -28,11 +28,14 @@ export function DialWorkspaceClient({
   initialDueCallbacks,
   isDemo,
   canManage = false,
+  screeningRequired = false,
 }: {
   dispositions: Disposition[];
   initialDueCallbacks: Callback[];
   isDemo: boolean;
   canManage?: boolean;
+  // Whether this workspace makes leads pass screening before they can be dialled (Compliance).
+  screeningRequired?: boolean;
 }) {
   const [current, setCurrent] = useState<DialWorkspaceLead | null | undefined>(undefined);
   const [pulling, startPull] = useTransition();
@@ -224,7 +227,9 @@ export function DialWorkspaceClient({
                 <p className="text-center">
                   {reason
                     ? reason.detail
-                    : "A lead is served only when it is screened, on an active campaign you are rostered on and inside its calling hours, and assigned to you or to nobody."}
+                    : screeningRequired
+                      ? "A lead is served only when it is screened, on an active campaign you are rostered on and inside its calling hours, and assigned to you or to nobody."
+                      : "A lead is served when it is on an active campaign you are rostered on and inside its calling hours (or assigned to you with no campaign), and not on the do-not-call list."}
                 </p>
                 {canManage ? (
                   <div className="flex flex-wrap justify-center gap-2 pt-1">
@@ -236,8 +241,13 @@ export function DialWorkspaceClient({
                     <Button asChild variant="secondary">
                       <Link href="/admin/import">Upload leads</Link>
                     </Button>
+                    {screeningRequired && (
+                      <Button asChild variant="secondary">
+                        <Link href="/admin/compliance">Screen leads</Link>
+                      </Button>
+                    )}
                     <Button asChild variant="secondary">
-                      <Link href="/admin/compliance">Screen leads</Link>
+                      <Link href="/admin/leads">Assign leads</Link>
                     </Button>
                     <Button asChild variant="secondary">
                       <Link href="/admin/campaigns">Campaign rosters</Link>

@@ -9,6 +9,7 @@ const TABS = [
   { href: "/admin/settings/campaigns", label: "Campaigns" },
   { href: "/admin/settings/email", label: "Email templates" },
   { href: "/admin/settings/zoom", label: "Zoom" },
+  { href: "/admin/compliance", label: "Screening & compliance" },
   { href: "/admin/integrations", label: "Plugins & integrations" },
 ];
 

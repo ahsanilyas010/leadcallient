@@ -41,7 +41,7 @@ async function main() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const { data: workspace } = await admin.from("workspaces").select("id, demo_allowed_numbers").eq("slug", "demo").single();
+  const { data: workspace } = await admin.from("workspaces").select("id, demo_allowed_numbers, require_screening").eq("slug", "demo").single();
   if (!workspace) {
     console.error("compliance-gate-proof: run `npm run seed` first - demo workspace not found.");
     process.exit(1);
@@ -60,7 +60,14 @@ async function main() {
   // the duration of the run and the original list is restored afterwards.
   const originalAllowed = workspace.demo_allowed_numbers ?? [];
   const testNumbers = Array.from({ length: 8 }, (_, i) => `+1555999000${i + 1}`);
-  await admin.from("workspaces").update({ demo_allowed_numbers: [...originalAllowed, ...testNumbers] }).eq("id", workspace.id);
+  // Screening is optional per workspace (migration 113); the "unscreened lead is
+  // never returned" assertion below is about the gate WITH screening required,
+  // so it is switched on for the run and restored afterwards.
+  const originalRequireScreening = workspace.require_screening;
+  await admin
+    .from("workspaces")
+    .update({ demo_allowed_numbers: [...originalAllowed, ...testNumbers], require_screening: true })
+    .eq("id", workspace.id);
 
   console.log("Setting up an isolated test campaign...");
   const { data: campaign, error: campaignError } = await admin
@@ -161,7 +168,7 @@ async function main() {
   await admin.from("leads").delete().eq("campaign_id", campaign.id);
   await admin.from("campaign_assignments").delete().eq("campaign_id", campaign.id);
   await admin.from("campaigns").delete().eq("id", campaign.id);
-  await admin.from("workspaces").update({ demo_allowed_numbers: originalAllowed }).eq("id", workspace.id);
+  await admin.from("workspaces").update({ demo_allowed_numbers: originalAllowed, require_screening: originalRequireScreening }).eq("id", workspace.id);
 
   console.log(`\n${failures} failed.`);
   process.exit(failures ? 1 : 0);

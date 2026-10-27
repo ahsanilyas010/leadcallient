@@ -9,7 +9,7 @@ import { SiteFooter, SiteHeader } from "@/components/landing/site-chrome";
 
 export const metadata: Metadata = {
   title: "Contact us",
-  description: `Talk to the ${BRAND.productName} team at ${COMPANY.legalName}, ${companyAddressLine()}. Message us on WhatsApp about plans, getting your team set up or Zoom Phone calling.`,
+  description: `Talk to the ${BRAND.productName} team at ${COMPANY.legalName}, ${companyAddressLine()}. Call or message us about pricing, getting your team set up or Zoom Phone calling.`,
   alternates: { canonical: "/contact" },
   openGraph: {
     type: "website",
@@ -46,26 +46,40 @@ function structuredData() {
   };
 }
 
-function WhatsAppButton() {
-  const base = "inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-base font-semibold sm:w-auto";
-  if (!COMPANY.whatsappUrl) {
-    return (
-      <span aria-disabled="true" className={`${base} cursor-not-allowed bg-[#25D366]/40 text-white`}>
-        <MessageCircle className="h-5 w-5" /> Chat on WhatsApp · coming soon
-      </span>
-    );
-  }
-  return (
-    <a
-      href={COMPANY.whatsappUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`${base} bg-[#25D366] text-white shadow-lg shadow-[#25D366]/30 transition hover:brightness-105`}
-    >
-      <MessageCircle className="h-5 w-5" /> Chat on WhatsApp
-    </a>
-  );
+const BTN = "inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-base font-semibold sm:w-auto";
+
+// The ways to reach us, in the order we'd rather be contacted. Each only
+// shows once its NEXT_PUBLIC_COMPANY_* value is set; nothing is shown as
+// "coming soon".
+function ContactButtons() {
+  const buttons = [
+    COMPANY.phone && (
+      <a key="call" href={`tel:${COMPANY.phone.replace(/\s+/g, "")}`} className={`${BTN} bg-gold-gradient text-ink shadow-lg shadow-gold/25 transition hover:brightness-105`}>
+        <Phone className="h-5 w-5" /> Call {COMPANY.phone}
+      </a>
+    ),
+    COMPANY.whatsappUrl && (
+      <a
+        key="whatsapp"
+        href={COMPANY.whatsappUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`${BTN} bg-[#25D366] text-white shadow-lg shadow-[#25D366]/30 transition hover:brightness-105`}
+      >
+        <MessageCircle className="h-5 w-5" /> Chat on WhatsApp
+      </a>
+    ),
+    COMPANY.email && (
+      <a key="email" href={`mailto:${COMPANY.email}`} className={`${BTN} bg-white/10 text-white ring-1 ring-white/30 transition hover:bg-white/15`}>
+        <Mail className="h-5 w-5" /> Email us
+      </a>
+    ),
+  ].filter(Boolean);
+  if (buttons.length === 0) return null;
+  return <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">{buttons}</div>;
 }
+
+const HAS_DIRECT_CONTACT = Boolean(COMPANY.phone || COMPANY.whatsappUrl || COMPANY.email);
 
 export default function ContactPage() {
   const a = COMPANY.address;
@@ -83,11 +97,10 @@ export default function ContactPage() {
               Let&apos;s <span className="text-gold-gradient">talk.</span>
             </h1>
             <p className="mx-auto mt-5 max-w-xl text-lg text-white/75">
-              Questions about plans, getting your team set up or Zoom Phone calling? Message us on WhatsApp and a real person will reply.
+              Questions about pricing, adding agents, getting your team set up or Zoom Phone calling?{" "}
+              {HAS_DIRECT_CONTACT ? "Call or message us and a real person will reply." : "Reach us at the address below and a real person will reply."}
             </p>
-            <div className="mt-8 flex justify-center">
-              <WhatsAppButton />
-            </div>
+            <ContactButtons />
           </div>
         </section>
 

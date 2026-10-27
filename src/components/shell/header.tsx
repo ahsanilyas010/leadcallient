@@ -71,7 +71,7 @@ const TITLES: Record<string, string> = {
   live: "Live floor",
   portal: "Client reports",
   quality: "Quality",
-  billing: "Plan & billing",
+  billing: "Agents & billing",
   branding: "Branding",
   email: "Email templates",
   performance: "Performance",
