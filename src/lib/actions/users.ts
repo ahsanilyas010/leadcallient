@@ -14,6 +14,9 @@ import { BRAND } from "@/lib/brand";
 
 export interface CreateUserResult {
   error?: string;
+  // True when the refusal is "no agent seats left": the People page opens the
+  // purchase-seats popup instead of showing the error inline.
+  seatLimit?: boolean;
   tempPassword?: string;
   fullName?: string;
 }
@@ -88,7 +91,7 @@ export async function createUser(_prev: CreateUserResult, formData: FormData): P
 
   if (input.role === "agent") {
     const used = await activeAgentCount(admin, workspace.id);
-    if (seatsFull(used, workspace.seat_limit)) return { error: seatLimitMessage(workspace.seat_limit) };
+    if (seatsFull(used, workspace.seat_limit)) return { error: seatLimitMessage(workspace.seat_limit), seatLimit: true };
   }
 
   const agentCode = input.agent_code || (input.role === "agent" ? await nextAgentCode(workspace.id) : null);
@@ -219,6 +222,8 @@ export async function createTeam(name: string): Promise<TeamResult> {
 
 export interface UpdateUserResult {
   error?: string;
+  // See CreateUserResult.seatLimit.
+  seatLimit?: boolean;
   ok?: boolean;
 }
 
@@ -264,7 +269,7 @@ export async function updateUser(_prev: UpdateUserResult, formData: FormData): P
     if (target.role === "super_admin" && caller.role !== "super_admin") return { error: "Only a super admin can change another super admin." };
     if (input.role === "client") return { error: "Create a new client login instead: it has to be tied to a client." };
     if (input.role === "agent" && target.is_active && seatsFull(await activeAgentCount(admin, workspace.id), workspace.seat_limit)) {
-      return { error: seatLimitMessage(workspace.seat_limit) };
+      return { error: seatLimitMessage(workspace.seat_limit), seatLimit: true };
     }
   } else if (target.role === "super_admin" && caller.role !== "super_admin") {
     return { error: "Only a super admin can edit another super admin." };

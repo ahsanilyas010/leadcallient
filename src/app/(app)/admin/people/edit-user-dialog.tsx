@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Req, RoleField, TeamField, TimezoneField } from "./user-fields";
+import { SeatLimitDialog } from "./seat-limit-dialog";
 
 const initialState: UpdateUserResult = {};
 
@@ -40,6 +41,7 @@ export function EditUserDialog({
   user,
   teams,
   seatsLeft,
+  seatLimit,
   isSuperAdmin,
   open,
   onOpenChange,
@@ -47,6 +49,7 @@ export function EditUserDialog({
   user: EditableUser;
   teams: { id: string; name: string }[];
   seatsLeft: number;
+  seatLimit: number;
   isSuperAdmin: boolean;
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -57,6 +60,7 @@ export function EditUserDialog({
   const [teamList, setTeamList] = useState(teams);
   const [teamId, setTeamId] = useState(user.team_id ?? "");
   const [confirmAdmin, setConfirmAdmin] = useState(user.role === "super_admin");
+  const [seatLimitOpen, setSeatLimitOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -68,9 +72,15 @@ export function EditUserDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
+  // The server is the final word on seats (another admin may have filled the
+  // last one meanwhile): its refusal opens the same popup.
+  useEffect(() => {
+    if (state.seatLimit) setSeatLimitOpen(true);
+  }, [state]);
+
   const seatChange = role === "agent" && user.role !== "agent";
   const noSeat = seatChange && seatsLeft <= 0;
-  const blocked = noSeat || !isValidTimezone(timezone) || (role === "super_admin" && !confirmAdmin);
+  const blocked = !isValidTimezone(timezone) || (role === "super_admin" && !confirmAdmin);
   const idp = `eu-${user.id.slice(0, 8)}-`;
 
   return (
@@ -80,7 +90,15 @@ export function EditUserDialog({
           <DialogTitle>Edit {user.full_name}</DialogTitle>
           <DialogDescription>Change their name, role, team or time zone. Their email and password are unchanged.</DialogDescription>
         </DialogHeader>
-        <form action={formAction} className="flex flex-col gap-3">
+        <form
+          action={formAction}
+          className="flex flex-col gap-3"
+          onSubmit={(e) => {
+            if (!noSeat) return;
+            e.preventDefault();
+            setSeatLimitOpen(true);
+          }}
+        >
           <input type="hidden" name="user_id" value={user.id} />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
@@ -118,7 +136,7 @@ export function EditUserDialog({
             <TimezoneField idPrefix={idp} value={timezone} onChange={setTimezone} />
           </div>
           <TeamField idPrefix={idp} teams={teamList} onTeams={setTeamList} value={teamId} onChange={setTeamId} />
-          {state.error && (
+          {state.error && !state.seatLimit && (
             <p role="alert" className="rounded-md bg-danger-tint px-3 py-2 text-xs text-danger">
               {state.error}
             </p>
@@ -131,6 +149,7 @@ export function EditUserDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+      <SeatLimitDialog open={seatLimitOpen} onOpenChange={setSeatLimitOpen} seatLimit={seatLimit} isSuperAdmin={isSuperAdmin} />
     </Dialog>
   );
 }

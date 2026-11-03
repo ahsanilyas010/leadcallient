@@ -52,6 +52,7 @@ export default async function PeoplePage() {
             teams={teams ?? []}
             clients={clients ?? []}
             seatsLeft={seatsLeft}
+            seatLimit={workspace.seat_limit}
             existingEmails={(people ?? []).map((p) => p.email.toLowerCase())}
             isSuperAdmin={profile.role === "super_admin"}
             hideTrigger={onlyOwner}
@@ -104,6 +105,7 @@ export default async function PeoplePage() {
         campaigns={campaigns ?? []}
         canManage={canCreate}
         seatsLeft={seatsLeft}
+        seatLimit={workspace.seat_limit}
         isSuperAdmin={profile.role === "super_admin"}
         viewerTimezone={profile.timezone}
         zoomConnected={zoomConnected}
