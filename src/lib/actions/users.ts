@@ -7,7 +7,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { generateTempPassword } from "@/lib/auth/generate-password";
 import { accounts, AccountError } from "@/lib/accounts";
 import { getCurrentWorkspace } from "@/lib/workspace/current";
-import { activeAgentCount, seatLimitMessage } from "@/lib/workspace/limits";
+import { activeAgentCount, seatLimitMessage, seatsFull } from "@/lib/workspace/limits";
 import { createRealClient } from "@/lib/supabase/real";
 import { isValidTimezone } from "@/lib/timezones";
 import { BRAND } from "@/lib/brand";
@@ -88,7 +88,7 @@ export async function createUser(_prev: CreateUserResult, formData: FormData): P
 
   if (input.role === "agent") {
     const used = await activeAgentCount(admin, workspace.id);
-    if (used >= workspace.seat_limit) return { error: seatLimitMessage(workspace.seat_limit) };
+    if (seatsFull(used, workspace.seat_limit)) return { error: seatLimitMessage(workspace.seat_limit) };
   }
 
   const agentCode = input.agent_code || (input.role === "agent" ? await nextAgentCode(workspace.id) : null);
@@ -263,7 +263,7 @@ export async function updateUser(_prev: UpdateUserResult, formData: FormData): P
     if (input.role === "super_admin" && caller.role !== "super_admin") return { error: "Only a super admin can make another super admin." };
     if (target.role === "super_admin" && caller.role !== "super_admin") return { error: "Only a super admin can change another super admin." };
     if (input.role === "client") return { error: "Create a new client login instead: it has to be tied to a client." };
-    if (input.role === "agent" && target.is_active && (await activeAgentCount(admin, workspace.id)) >= workspace.seat_limit) {
+    if (input.role === "agent" && target.is_active && seatsFull(await activeAgentCount(admin, workspace.id), workspace.seat_limit)) {
       return { error: seatLimitMessage(workspace.seat_limit) };
     }
   } else if (target.role === "super_admin" && caller.role !== "super_admin") {

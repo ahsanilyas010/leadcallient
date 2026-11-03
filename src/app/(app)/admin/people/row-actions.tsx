@@ -3,15 +3,17 @@
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { MoreHorizontal, KeyRound, UserX, UserCheck, Copy, Check, Megaphone, Pencil } from "lucide-react";
+import { MoreHorizontal, KeyRound, UserX, UserCheck, Copy, Check, Megaphone, Pencil, Trash2 } from "lucide-react";
 import { resetPassword, type ResetPasswordResult } from "@/lib/actions/users";
 import { deactivateUser, reactivateUser } from "@/lib/actions/deactivate";
+import { deleteUser } from "@/lib/actions/delete-user";
 import { AssignToCampaignDialog } from "./assign-campaign-dialog";
 import { EditUserDialog, type EditableUser } from "./edit-user-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -42,6 +44,7 @@ export function PeopleRowActions({
   userName: string;
   isActive: boolean;
   // False for yourself and the workspace owner: the server refuses those too.
+  // Delete shares the same rule.
   canDeactivate: boolean;
   campaigns: { id: string; name: string; code?: string | null }[];
   teams: { id: string; name: string }[];
@@ -53,6 +56,8 @@ export function PeopleRowActions({
   const router = useRouter();
   const [resetOpen, setResetOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [state, formAction] = useActionState(resetPassword, initialState);
   const [confirmed, setConfirmed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -102,6 +107,14 @@ export function PeopleRowActions({
               <UserCheck className="mr-2 h-3.5 w-3.5" /> Reactivate
             </DropdownMenuItem>
           )}
+          {canDeactivate && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="danger" onSelect={() => setDeleteOpen(true)}>
+                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -115,6 +128,42 @@ export function PeopleRowActions({
           onOpenChange={setEditOpen}
         />
       )}
+
+      <Dialog open={deleteOpen} onOpenChange={(next) => !deleting && setDeleteOpen(next)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {userName}?</DialogTitle>
+            <DialogDescription>
+              This permanently removes their login and profile. It can&apos;t be undone. If they have made calls or have QA or meeting
+              history the delete is refused: deactivate them instead so that history stays intact.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="secondary" disabled={deleting} onClick={() => setDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              disabled={deleting}
+              onClick={async () => {
+                setDeleting(true);
+                const res = await deleteUser(userId);
+                setDeleting(false);
+                if (res.error) {
+                  toast.error(res.error);
+                  return;
+                }
+                toast.success(`${userName} deleted.`);
+                setDeleteOpen(false);
+                router.refresh();
+              }}
+            >
+              {deleting ? "Deleting…" : "Delete permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AssignToCampaignDialog
         open={assignOpen}
