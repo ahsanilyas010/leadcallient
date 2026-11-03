@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RealDatabase } from "@/lib/supabase/real-types";
+import { isUnlimitedSeats } from "@/lib/plan";
 
 // Only agents use a paid seat. Admins, managers, team leads, QA analysts and
 // client logins are free on every plan. Real-Postgres version, for Phase
@@ -14,6 +15,18 @@ export async function activeAgentCount(supabase: SupabaseClient<RealDatabase>, w
     .eq("role", "agent")
     .eq("is_active", true);
   return count ?? 0;
+}
+
+// True when one more active agent would exceed the workspace's seats. Always
+// false for a workspace with unlimited seats (see UNLIMITED_SEATS).
+export function seatsFull(used: number, seatLimit: number): boolean {
+  return !isUnlimitedSeats(seatLimit) && used >= seatLimit;
+}
+
+// Seats still free to hand out. Unlimited workspaces report the sentinel
+// itself so every `seatsLeft <= 0` check in the dialogs stays false.
+export function seatsRemaining(used: number, seatLimit: number): number {
+  return isUnlimitedSeats(seatLimit) ? seatLimit : Math.max(0, seatLimit - used);
 }
 
 export function seatLimitMessage(seats: number) {

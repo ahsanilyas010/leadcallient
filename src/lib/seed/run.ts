@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { RealDatabase } from "@/lib/supabase/real-types";
 import { DEMO_PASSWORD, DEMO_PERSONAS } from "./personas";
+import { UNLIMITED_SEATS } from "@/lib/plan";
 
 type Admin = SupabaseClient<RealDatabase>;
 
@@ -89,7 +90,8 @@ export async function seedAssortedWorkspace(admin: Admin): Promise<string | null
   const { data: ws, error: wsErr } = await admin.from("workspaces").select("id").eq("slug", "assorted").single();
   if (wsErr || !ws) throw wsErr ?? new Error("seed: assorted workspace not found after creation");
 
-  await admin.from("workspaces").update({ status: "active" }).eq("id", ws.id);
+  // The vendor's own workspace never hits the agent seat cap (see migration 115).
+  await admin.from("workspaces").update({ status: "active", seat_limit: UNLIMITED_SEATS }).eq("id", ws.id);
 
   return ws.id;
 }

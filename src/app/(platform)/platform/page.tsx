@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requirePlatformAdmin } from "@/lib/auth/current-profile";
 import { createRealClient } from "@/lib/supabase/real";
 import { SuspendButton } from "./platform-actions";
+import { fmtSeats } from "@/lib/plan";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
@@ -59,7 +60,7 @@ export default async function PlatformDashboardPage() {
                   </td>
                   <td className="px-4 py-3 capitalize">{w.plan}</td>
                   <td className="px-4 py-3">
-                    {seatsByWorkspace.get(w.id) ?? 0} / {w.seat_limit}
+                    {seatsByWorkspace.get(w.id) ?? 0} / {fmtSeats(w.seat_limit)}
                   </td>
                   <td className="px-4 py-3">{s?.agents_active_today ?? 0}</td>
                   <td className="px-4 py-3">{s?.calls_today ?? 0}</td>

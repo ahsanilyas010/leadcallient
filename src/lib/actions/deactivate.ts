@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireRealProfile } from "@/lib/auth/current-profile";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentWorkspace } from "@/lib/workspace/current";
-import { activeAgentCount, seatLimitMessage } from "@/lib/workspace/limits";
+import { activeAgentCount, seatLimitMessage, seatsFull } from "@/lib/workspace/limits";
 
 // Deactivate, never delete. A deleted user row orphans call attempts, QA
 // reviews and attendance history — the audit trail this exists for.
@@ -37,7 +37,7 @@ async function setActive(userId: string, isActive: boolean): Promise<{ error?: s
       .neq("id", target.id);
     if (!count) return { error: "That is the last active super admin. Make someone else a super admin first." };
   }
-  if (isActive && target.role === "agent" && (await activeAgentCount(admin, workspace.id)) >= workspace.seat_limit) {
+  if (isActive && target.role === "agent" && seatsFull(await activeAgentCount(admin, workspace.id), workspace.seat_limit)) {
     return { error: seatLimitMessage(workspace.seat_limit) };
   }
 

@@ -6,6 +6,7 @@ import { requireProfile } from "@/lib/auth/current-profile";
 import { getCurrentWorkspace } from "@/lib/workspace/current";
 import { createRealClient } from "@/lib/supabase/real";
 import { stripeConfigured } from "@/lib/billing/stripe";
+import { fmtSeats } from "@/lib/plan";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -126,7 +127,7 @@ export default async function IntegrationsPage() {
         </CardHeader>
         <CardContent className="space-y-1 text-xs text-muted">
           <div>
-            Plan: {workspace.plan} · billing status: {workspace.billing_status} · seat limit: {workspace.seat_limit}
+            Plan: {workspace.plan} · billing status: {workspace.billing_status} · seat limit: {fmtSeats(workspace.seat_limit)}
           </div>
           <div>{workspace.stripe_subscription_id ? "Active Stripe subscription on file." : "No Stripe subscription on file."}</div>
           <Link href="/admin/billing" className="font-medium text-brand-green-text underline">

@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import Link from "next/link";
 import { Building2, Sparkles, RotateCcw, Loader2 } from "lucide-react";
 import { resetRealDemoWorkspace } from "@/lib/actions/real-demo";
+import { fmtSeats, isUnlimitedSeats } from "@/lib/plan";
 
 export interface PlanInfo {
   workspaceName: string;
@@ -25,7 +26,7 @@ export interface PlanInfo {
 // DemoBar instead): workspace name, plan and agent seats, with an upgrade
 // link — plus a reset button when this *is* the real demo workspace.
 export function PlanBar({ info }: { info: PlanInfo }) {
-  const full = info.agentsUsed >= info.agentSeats;
+  const full = !isUnlimitedSeats(info.agentSeats) && info.agentsUsed >= info.agentSeats;
   const [pending, startTransition] = useTransition();
 
   return (
@@ -38,7 +39,7 @@ export function PlanBar({ info }: { info: PlanInfo }) {
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <span className={full ? "text-gold-soft" : "text-white/75"}>
-          {info.agentsUsed} of {info.agentSeats} agents
+          {isUnlimitedSeats(info.agentSeats) ? `${info.agentsUsed} agents · unlimited seats` : `${info.agentsUsed} of ${fmtSeats(info.agentSeats)} agents`}
         </span>
         {info.isRealDemo && (
           <button

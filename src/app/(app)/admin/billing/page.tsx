@@ -8,7 +8,7 @@ import { workspaceFromRow } from "@/lib/accounts/adapters";
 import { createRealClient } from "@/lib/supabase/real";
 import { stripeConfigured } from "@/lib/billing/stripe";
 import { bankTransferDetails } from "@/lib/billing/bank-transfer";
-import { FREE_AGENT_SEATS, SELF_SERVE_MAX_AGENTS } from "@/lib/plan";
+import { FREE_AGENT_SEATS, SELF_SERVE_MAX_AGENTS, fmtSeats, isUnlimitedSeats } from "@/lib/plan";
 import { ManageBillingButton, SeatPicker } from "./seat-picker";
 import { ContactCard } from "./contact-card";
 
@@ -20,7 +20,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const { status } = await searchParams;
   const workspace = workspaceFromRow(await getCurrentWorkspace());
   const used = await activeAgentCount(await createRealClient(), workspace.id);
-  const pct = Math.min(100, Math.round((used / workspace.agentSeats) * 100));
+  const unlimited = isUnlimitedSeats(workspace.agentSeats);
+  const pct = unlimited ? 0 : Math.min(100, Math.round((used / workspace.agentSeats) * 100));
   const paid = workspace.plan === "paid";
   // "simulate" (a Stripe-less preview upgrade) no longer applies — real
   // accounts always live in Supabase now, so an unconfigured deployment is
@@ -47,11 +48,13 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-blue">{selfServe ? "Current plan" : "Your workspace"}</div>
           <h1 className="mt-2 font-display text-3xl font-semibold text-ink">{selfServe ? (paid ? "Paid" : "Free") : workspace.name}</h1>
           <p className="mt-1 text-sm text-muted">
-            {selfServe
-              ? paid
-                ? `${workspace.agentSeats} agent seats, billed monthly`
-                : `${FREE_AGENT_SEATS} agents included, free forever`
-              : `${workspace.agentSeats} agent seat${workspace.agentSeats === 1 ? "" : "s"} on this workspace`}
+            {unlimited
+              ? "Unlimited agent seats on this workspace"
+              : selfServe
+                ? paid
+                  ? `${workspace.agentSeats} agent seats, billed monthly`
+                  : `${FREE_AGENT_SEATS} agents included, free forever`
+                : `${workspace.agentSeats} agent seat${workspace.agentSeats === 1 ? "" : "s"} on this workspace`}
           </p>
           {workspace.billingStatus === "past_due" && (
             <p className="mt-3 rounded-xl bg-danger-tint px-3 py-2 text-xs text-danger">Your last payment failed. Update your card to keep your seats.</p>
@@ -63,18 +66,20 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                 <Users className="h-4 w-4 text-brand-blue" /> Agent seats used
               </span>
               <span className="font-semibold tabular text-ink">
-                {used} / {workspace.agentSeats}
+                {used} / {fmtSeats(workspace.agentSeats)}
               </span>
             </div>
             <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-canvas ring-1 ring-line">
               <div className={`h-full rounded-full ${pct >= 100 ? "bg-gold-gradient" : "bg-brand-gradient"}`} style={{ width: `${pct}%` }} />
             </div>
             <p className="mt-2 text-xs text-muted">
-              {used >= workspace.agentSeats
+              {unlimited
+                ? "This workspace has no seat cap: add as many agents as you need."
+                : used >= workspace.agentSeats
                 ? selfServe
                   ? "All seats are in use. Add seats to create more agents."
                   : "All seats are in use. Contact us to add more agents."
-                : `${workspace.agentSeats - used} more agent${workspace.agentSeats - used === 1 ? "" : "s"} can be added.`}
+                  : `${workspace.agentSeats - used} more agent${workspace.agentSeats - used === 1 ? "" : "s"} can be added.`}
             </p>
           </div>
 
@@ -93,7 +98,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
               download invoices. Changes are prorated on your next bill.
             </p>
           </div>
-        ) : selfServe ? (
+        ) : selfServe && !unlimited ? (
           <SeatPicker
             min={Math.max(FREE_AGENT_SEATS + 1, used, paid ? workspace.agentSeats : 0)}
             max={SELF_SERVE_MAX_AGENTS}
