@@ -37,6 +37,8 @@ export interface NavItem {
 }
 
 const MANAGERS: AppRole[] = ["super_admin", "ops_manager"];
+// Managers plus the Data-only role: the data screens.
+const DATA: AppRole[] = [...MANAGERS, "data_manager"];
 const MANAGERS_AND_LEADS: AppRole[] = ["super_admin", "ops_manager", "team_lead"];
 
 // Every route here is a real, Postgres-backed screen. team_lead sees a
@@ -51,14 +53,15 @@ export const NAV: NavItem[] = [
   { href: "/quality", label: "QA queue", icon: "ShieldCheck", roles: ["qa_analyst"] },
   { href: "/meetings", label: "Meetings", icon: "Video", roles: ["super_admin", "ops_manager", "team_lead", "agent"] },
   { href: "/live", label: "Live floor", icon: "Activity", roles: MANAGERS_AND_LEADS },
-  { href: "/performance", label: "Performance", icon: "BarChart3", roles: ["agent", ...MANAGERS_AND_LEADS] },
+  { href: "/performance", label: "Performance", icon: "BarChart3", roles: ["agent", ...MANAGERS_AND_LEADS, "data_manager"] },
   { href: "/admin/people", label: "People", icon: "Users", roles: MANAGERS_AND_LEADS },
-  { href: "/admin/campaigns", label: "Campaigns", icon: "Megaphone", roles: MANAGERS },
-  { href: "/admin/leads", label: "Leads", icon: "Inbox", roles: MANAGERS },
+  { href: "/admin/campaigns", label: "Campaigns", icon: "Megaphone", roles: DATA },
+  { href: "/admin/leads", label: "Leads", icon: "Inbox", roles: DATA },
   { href: "/admin/attendance", label: "Attendance", icon: "CalendarCheck", roles: MANAGERS_AND_LEADS },
   { href: "/admin/compliance", label: "Compliance", icon: "ShieldCheck", roles: MANAGERS },
-  { href: "/admin/import", label: "Upload leads", icon: "Upload", roles: MANAGERS },
-  { href: "/admin/data", label: "Data", icon: "Database", roles: MANAGERS },
+  { href: "/admin/import", label: "Upload leads", icon: "Upload", roles: DATA },
+  { href: "/admin/migrate", label: "Migrate from a CRM", icon: "PlugZap", roles: DATA },
+  { href: "/admin/data", label: "Data", icon: "Database", roles: DATA },
   { href: "/quality", label: "Quality", icon: "ShieldCheck", roles: MANAGERS },
   { href: "/portal", label: "Client reports", icon: "Building2", roles: MANAGERS },
   { href: "/admin/integrations", label: "Integrations", icon: "PlugZap", roles: MANAGERS },
@@ -81,6 +84,8 @@ export function homeFor(role: AppRole): string {
       return "/leadgen";
     case "qa_analyst":
       return "/quality";
+    case "data_manager":
+      return "/admin/leads";
     default:
       return "/live";
   }

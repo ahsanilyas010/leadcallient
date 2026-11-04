@@ -32,3 +32,20 @@ export function seatsRemaining(used: number, seatLimit: number): number {
 export function seatLimitMessage(seats: number) {
   return `Your plan includes ${seats} agent${seats === 1 ? "" : "s"}, and they're all in use. Add more under Agents & billing to create more agents.`;
 }
+
+// Data-only seats (migration 117): counted separately from agent seats.
+export async function activeDataSeatCount(supabase: SupabaseClient<RealDatabase>, workspaceId: string): Promise<number> {
+  const { count } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", workspaceId)
+    .eq("role", "data_manager")
+    .eq("is_active", true);
+  return count ?? 0;
+}
+
+export function dataSeatLimitMessage(seats: number) {
+  return seats === 0
+    ? "Your plan doesn't include Data-only seats yet. Add them under Agents & billing to create a Data-only login."
+    : `Your plan includes ${seats} Data-only seat${seats === 1 ? "" : "s"}, and they're all in use. Add more under Agents & billing.`;
+}

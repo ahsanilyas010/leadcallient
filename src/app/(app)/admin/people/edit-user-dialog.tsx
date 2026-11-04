@@ -42,6 +42,8 @@ export function EditUserDialog({
   teams,
   seatsLeft,
   seatLimit,
+  dataSeatsLeft = 0,
+  dataSeatLimit = 0,
   isSuperAdmin,
   open,
   onOpenChange,
@@ -50,6 +52,8 @@ export function EditUserDialog({
   teams: { id: string; name: string }[];
   seatsLeft: number;
   seatLimit: number;
+  dataSeatsLeft?: number;
+  dataSeatLimit?: number;
   isSuperAdmin: boolean;
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -61,6 +65,7 @@ export function EditUserDialog({
   const [teamId, setTeamId] = useState(user.team_id ?? "");
   const [confirmAdmin, setConfirmAdmin] = useState(user.role === "super_admin");
   const [seatLimitOpen, setSeatLimitOpen] = useState(false);
+  const [seatKind, setSeatKind] = useState<"agent" | "data">("agent");
   const router = useRouter();
 
   useEffect(() => {
@@ -75,11 +80,15 @@ export function EditUserDialog({
   // The server is the final word on seats (another admin may have filled the
   // last one meanwhile): its refusal opens the same popup.
   useEffect(() => {
-    if (state.seatLimit) setSeatLimitOpen(true);
+    if (state.seatLimit) {
+      setSeatKind(state.seatKind ?? "agent");
+      setSeatLimitOpen(true);
+    }
   }, [state]);
 
   const seatChange = role === "agent" && user.role !== "agent";
-  const noSeat = seatChange && seatsLeft <= 0;
+  const dataSeatChange = role === "data_manager" && user.role !== "data_manager";
+  const noSeat = (seatChange && seatsLeft <= 0) || (dataSeatChange && dataSeatsLeft <= 0);
   const blocked = !isValidTimezone(timezone) || (role === "super_admin" && !confirmAdmin);
   const idp = `eu-${user.id.slice(0, 8)}-`;
 
@@ -96,6 +105,7 @@ export function EditUserDialog({
           onSubmit={(e) => {
             if (!noSeat) return;
             e.preventDefault();
+            setSeatKind(dataSeatChange ? "data" : "agent");
             setSeatLimitOpen(true);
           }}
         >
@@ -127,6 +137,7 @@ export function EditUserDialog({
                 value={role}
                 onChange={setRole}
                 seatsLeft={seatsLeft}
+                dataSeatsLeft={dataSeatsLeft}
                 confirmAdmin={confirmAdmin}
                 onConfirmAdmin={setConfirmAdmin}
                 canMakeSuperAdmin={isSuperAdmin}
@@ -149,7 +160,13 @@ export function EditUserDialog({
           </DialogFooter>
         </form>
       </DialogContent>
-      <SeatLimitDialog open={seatLimitOpen} onOpenChange={setSeatLimitOpen} seatLimit={seatLimit} isSuperAdmin={isSuperAdmin} />
+      <SeatLimitDialog
+        open={seatLimitOpen}
+        onOpenChange={setSeatLimitOpen}
+        kind={seatKind}
+        seatLimit={seatKind === "data" ? dataSeatLimit : seatLimit}
+        isSuperAdmin={isSuperAdmin}
+      />
     </Dialog>
   );
 }

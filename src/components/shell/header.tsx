@@ -1,5 +1,6 @@
 "use client";
 
+import { worksShifts } from "@/lib/roles";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { LogOut, User, CalendarPlus, Menu, Search, CircleHelp, ListChecks } from "lucide-react";
@@ -113,9 +114,9 @@ export function Header({
   const guide = useGuide();
   const [now, setNow] = useState<Date | null>(null);
   const [leaveOpen, setLeaveOpen] = useState(false);
-  // Clock-in, callbacks and leave are for people on a shift; clients and the
-  // lead-gen seat have none.
-  const isStaff = profile.role !== "client" && profile.role !== "lead_gen";
+  // Clock-in, callbacks and leave are for people on a shift; clients, the
+  // lead-gen seat and Data-only users have none.
+  const isStaff = worksShifts(profile.role);
 
   useEffect(() => {
     setNow(new Date());

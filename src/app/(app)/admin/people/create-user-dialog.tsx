@@ -42,6 +42,9 @@ type DialogProps = {
   // signed-in admin may mint another super admin / open billing.
   seatsLeft: number;
   seatLimit: number;
+  // Data-only seats, counted separately.
+  dataSeatsLeft?: number;
+  dataSeatLimit?: number;
   existingEmails: string[];
   isSuperAdmin: boolean;
   label?: string;
@@ -72,6 +75,8 @@ function CreateUserDialogRound({
   clients,
   seatsLeft,
   seatLimit,
+  dataSeatsLeft = 0,
+  dataSeatLimit = 0,
   existingEmails,
   isSuperAdmin,
   label = "Create user",
@@ -95,12 +100,16 @@ function CreateUserDialogRound({
   const [confirmed, setConfirmed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [seatLimitOpen, setSeatLimitOpen] = useState(false);
+  const [seatKind, setSeatKind] = useState<"agent" | "data">("agent");
   const router = useRouter();
 
   // The server is the final word on seats (another admin may have filled the
   // last one meanwhile): its refusal opens the same popup.
   useEffect(() => {
-    if (state.seatLimit) setSeatLimitOpen(true);
+    if (state.seatLimit) {
+      setSeatKind(state.seatKind ?? "agent");
+      setSeatLimitOpen(true);
+    }
   }, [state]);
 
   useEffect(() => {
@@ -127,7 +136,7 @@ function CreateUserDialogRound({
   }
 
   const emailTaken = email.trim() !== "" && existingEmails.includes(email.trim().toLowerCase());
-  const noSeat = role === "agent" && seatsLeft <= 0;
+  const noSeat = (role === "agent" && seatsLeft <= 0) || (role === "data_manager" && dataSeatsLeft <= 0);
   const blocked = emailTaken || (role === "super_admin" && !confirmAdmin) || !isValidTimezone(timezone) || (role === "client" && !clientId);
 
   return (
@@ -158,6 +167,7 @@ function CreateUserDialogRound({
                 onSubmit={(e) => {
                   if (!noSeat) return;
                   e.preventDefault();
+                  setSeatKind(role === "data_manager" ? "data" : "agent");
                   setSeatLimitOpen(true);
                 }}
               >
@@ -207,6 +217,7 @@ function CreateUserDialogRound({
                     value={role}
                     onChange={setRole}
                     seatsLeft={seatsLeft}
+                    dataSeatsLeft={dataSeatsLeft}
                     confirmAdmin={confirmAdmin}
                     onConfirmAdmin={setConfirmAdmin}
                     canMakeSuperAdmin={isSuperAdmin}
@@ -312,7 +323,13 @@ function CreateUserDialogRound({
           )}
         </AnimatePresence>
       </DialogContent>
-      <SeatLimitDialog open={seatLimitOpen} onOpenChange={setSeatLimitOpen} seatLimit={seatLimit} isSuperAdmin={isSuperAdmin} />
+      <SeatLimitDialog
+        open={seatLimitOpen}
+        onOpenChange={setSeatLimitOpen}
+        kind={seatKind}
+        seatLimit={seatKind === "data" ? dataSeatLimit : seatLimit}
+        isSuperAdmin={isSuperAdmin}
+      />
     </Dialog>
   );
 }

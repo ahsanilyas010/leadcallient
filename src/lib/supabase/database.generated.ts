@@ -2954,6 +2954,15 @@ export type Database = {
           suppressed: number
         }[]
       }
+      duplicate_lead_groups: {
+        Args: { p_limit?: number }
+        Returns: {
+          lead_count: number
+          lead_ids: string[]
+          match_on: string
+          match_value: string
+        }[]
+      }
       erase_person: {
         Args: { p_email: string; p_phone_hash: string; p_suppress?: boolean }
         Returns: Json
@@ -3050,6 +3059,10 @@ export type Database = {
       mark_onboarding_step: {
         Args: { p_step: string; p_workspace_id: string }
         Returns: undefined
+      }
+      merge_leads: {
+        Args: { p_keep: string; p_merge: string[] }
+        Returns: number
       }
       my_campaign_ids: { Args: never; Returns: string[] }
       my_client_id: { Args: never; Returns: string }

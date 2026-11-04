@@ -235,3 +235,19 @@ export async function bulkEditLeads(leadIds: string[], edit: BulkEdit): Promise<
   touch();
   return { ok: true, count };
 }
+
+// Data cleanup: merge duplicates into the lead being kept (see migration 119:
+// gaps filled, tags and history moved across, the others to the trash).
+export async function mergeLeads(keepId: string, mergeIds: string[]): Promise<BulkResult> {
+  const profile = await requireManager();
+  if (!profile) return { error: "Only an admin, ops manager or Data-only user can merge leads." };
+  if (!uuid.safeParse(keepId).success) return { error: "Choose the lead to keep." };
+  const ids = cleanIds(mergeIds.filter((id) => id !== keepId));
+  if (!ids) return { error: "Choose at least one other lead to merge in." };
+  const supabase = await createRealClient();
+  const { data, error } = await supabase.rpc("merge_leads", { p_keep: keepId, p_merge: ids });
+  if (error) return { error: error.message.replace(/^.*?ERROR:\s*/, "") };
+  touch();
+  revalidatePath("/admin/leads/duplicates");
+  return { ok: true, count: data ?? 0 };
+}

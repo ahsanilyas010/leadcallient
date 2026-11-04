@@ -44,6 +44,8 @@ export function PeopleTable({
   canManage,
   seatsLeft,
   seatLimit,
+  dataSeatsLeft = 0,
+  dataSeatLimit = 0,
   isSuperAdmin,
   viewerTimezone,
   zoomConnected,
@@ -54,6 +56,8 @@ export function PeopleTable({
   canManage: boolean;
   seatsLeft: number;
   seatLimit: number;
+  dataSeatsLeft?: number;
+  dataSeatLimit?: number;
   isSuperAdmin: boolean;
   viewerTimezone: string;
   zoomConnected: boolean;
@@ -232,6 +236,8 @@ export function PeopleTable({
                         teams={teams}
                         seatsLeft={seatsLeft}
                         seatLimit={seatLimit}
+                        dataSeatsLeft={dataSeatsLeft}
+                        dataSeatLimit={dataSeatLimit}
                         isSuperAdmin={isSuperAdmin}
                         editable={{
                           id: p.id,

@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { CheckCircle2, Users } from "lucide-react";
 import { requireProfile } from "@/lib/auth/current-profile";
 import { getCurrentWorkspace } from "@/lib/workspace/current";
-import { activeAgentCount } from "@/lib/workspace/limits";
+import { activeAgentCount, activeDataSeatCount } from "@/lib/workspace/limits";
 import { workspaceFromRow } from "@/lib/accounts/adapters";
+import Link from "next/link";
 import { createRealClient } from "@/lib/supabase/real";
 import { stripeConfigured } from "@/lib/billing/stripe";
 import { bankTransferDetails } from "@/lib/billing/bank-transfer";
@@ -18,8 +19,12 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const profile = await requireProfile();
   if (profile.role !== "super_admin") redirect("/start");
   const { status } = await searchParams;
-  const workspace = workspaceFromRow(await getCurrentWorkspace());
-  const used = await activeAgentCount(await createRealClient(), workspace.id);
+  const row = await getCurrentWorkspace();
+  const workspace = workspaceFromRow(row);
+  const supabase = await createRealClient();
+  const [used, dataUsed] = await Promise.all([activeAgentCount(supabase, workspace.id), activeDataSeatCount(supabase, workspace.id)]);
+  const dataLimit = row.data_seat_limit;
+  const dataUnlimited = isUnlimitedSeats(dataLimit);
   const unlimited = isUnlimitedSeats(workspace.agentSeats);
   const pct = unlimited ? 0 : Math.min(100, Math.round((used / workspace.agentSeats) * 100));
   const paid = workspace.plan === "paid";
@@ -108,6 +113,39 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         ) : (
           <ContactCard workspaceName={workspace.name} />
         )}
+      </div>
+
+      <div id="data-seats" className="rounded-3xl bg-white p-6 ring-1 ring-line sm:p-8" data-testid="data-seats">
+        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-blue">Data-only seats</div>
+        <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-display text-xl font-semibold text-ink">For people who work with data but never call</h2>
+          <span className="font-semibold tabular text-ink">
+            {dataUsed} / {fmtSeats(dataLimit)} used
+          </span>
+        </div>
+        <p className="mt-1 max-w-3xl text-sm text-muted">
+          Lead managers, list buyers, data entry and back-office staff: they import, export, edit and clean leads and contacts, build lists,
+          tags and campaigns, and view reports, with no calling controls anywhere. Data-only seats are counted separately from agent seats.
+          Admins, managers, team leads and QA logins stay free.
+        </p>
+        <p className="mt-3 text-sm text-ink">
+          {dataUnlimited
+            ? "This workspace has unlimited Data-only seats."
+            : dataLimit === 0
+              ? "Your plan doesn't include Data-only seats yet."
+              : dataUsed >= dataLimit
+                ? "All your Data-only seats are in use."
+                : `${dataLimit - dataUsed} more Data-only user${dataLimit - dataUsed === 1 ? "" : "s"} can be added under People.`}{" "}
+          {!dataUnlimited && (
+            <>
+              Data-only seats are added by our team for now:{" "}
+              <Link href="/contact" className="font-semibold text-brand-blue hover:underline">
+                contact us
+              </Link>{" "}
+              with how many you need.
+            </>
+          )}
+        </p>
       </div>
 
       {bank && (

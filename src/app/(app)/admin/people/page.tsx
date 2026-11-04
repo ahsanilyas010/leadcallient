@@ -6,7 +6,7 @@ import { requireRole } from "@/lib/auth/current-profile";
 import { createRealClient } from "@/lib/supabase/real";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentWorkspace } from "@/lib/workspace/current";
-import { activeAgentCount, seatsRemaining } from "@/lib/workspace/limits";
+import { activeAgentCount, activeDataSeatCount, seatsRemaining } from "@/lib/workspace/limits";
 import { fmtSeats, isUnlimitedSeats } from "@/lib/plan";
 import { CreateUserDialog } from "./create-user-dialog";
 import { PeopleTable } from "./people-table";
@@ -35,7 +35,7 @@ export default async function PeoplePage() {
     supabase.from("campaigns").select("id, name").order("name"),
     lastSignIns(canCreate),
   ]);
-  const agentsUsed = await activeAgentCount(supabase, workspace.id);
+  const [agentsUsed, dataUsed] = await Promise.all([activeAgentCount(supabase, workspace.id), activeDataSeatCount(supabase, workspace.id)]);
   const { data: zoomCred } = canCreate
     ? await supabase.from("zoom_credentials").select("status").eq("workspace_id", workspace.id).maybeSingle()
     : { data: null };
@@ -43,6 +43,7 @@ export default async function PeoplePage() {
   // Just the account that signed up: nudge them to add their first agent.
   const onlyOwner = (people ?? []).length <= 1;
   const seatsLeft = seatsRemaining(agentsUsed, workspace.seat_limit);
+  const dataSeatsLeft = seatsRemaining(dataUsed, workspace.data_seat_limit);
 
   return (
     <div className="p-4">
@@ -53,6 +54,8 @@ export default async function PeoplePage() {
             clients={clients ?? []}
             seatsLeft={seatsLeft}
             seatLimit={workspace.seat_limit}
+            dataSeatsLeft={dataSeatsLeft}
+            dataSeatLimit={workspace.data_seat_limit}
             existingEmails={(people ?? []).map((p) => p.email.toLowerCase())}
             isSuperAdmin={profile.role === "super_admin"}
             hideTrigger={onlyOwner}
@@ -82,6 +85,9 @@ export default async function PeoplePage() {
         {isUnlimitedSeats(workspace.seat_limit)
           ? `Unlimited agent seats on this workspace: ${agentsUsed} in use.`
           : `${workspace.plan === "free" ? "Free plan" : "Your plan"}: ${agentsUsed} of ${fmtSeats(workspace.seat_limit)} agent seats used.`}{" "}
+        {isUnlimitedSeats(workspace.data_seat_limit)
+          ? `Data-only seats: unlimited, ${dataUsed} in use.`
+          : `Data-only seats: ${dataUsed} of ${fmtSeats(workspace.data_seat_limit)} used.`}{" "}
         Admins, managers, team leads, lead gen, QA and client logins don&apos;t use a seat.
       </div>
 
@@ -106,6 +112,8 @@ export default async function PeoplePage() {
         canManage={canCreate}
         seatsLeft={seatsLeft}
         seatLimit={workspace.seat_limit}
+        dataSeatsLeft={dataSeatsLeft}
+        dataSeatLimit={workspace.data_seat_limit}
         isSuperAdmin={profile.role === "super_admin"}
         viewerTimezone={profile.timezone}
         zoomConnected={zoomConnected}

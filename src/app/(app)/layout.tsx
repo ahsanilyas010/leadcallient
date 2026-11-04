@@ -9,6 +9,7 @@ import { activeAgentCount } from "@/lib/workspace/limits";
 import { createRealClient } from "@/lib/supabase/real";
 import { fetchGuideState, fetchSetupProgress } from "@/lib/guide/server";
 import { isManagerRole } from "@/lib/guide/tours";
+import { worksShifts } from "@/lib/roles";
 import type { GuideInit } from "@/components/guide/guide-provider";
 import { stripeConfigured } from "@/lib/billing/stripe";
 
@@ -25,7 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Attendance and callbacks are staff concepts — a client login has no
   // shift to clock into and no leads to follow up on, so skip the queries
   // and let Header hide that chrome entirely for this role.
-  const isStaff = profile.role !== "client" && profile.role !== "lead_gen";
+  const isStaff = worksShifts(profile.role);
   const supabase = await createRealClient();
   const manager = isManagerRole(profile.role);
   const [workspace, event, callbacks, agentsUsed, guideState, setupProgress] = await Promise.all([

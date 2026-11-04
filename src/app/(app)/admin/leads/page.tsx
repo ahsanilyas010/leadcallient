@@ -130,6 +130,13 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <a
+            href={`/api/leads/export?${new URLSearchParams(Object.entries(filters).filter(([, v]) => Boolean(v)) as [string, string][]).toString()}`}
+            className="inline-flex h-9 items-center justify-center rounded-lg border border-line bg-white px-3 text-sm font-medium text-ink hover:bg-canvas"
+            data-testid="export-leads"
+          >
+            Export CSV
+          </a>
           <Link
             href="/admin/leads/duplicates"
             className="inline-flex h-9 items-center justify-center rounded-lg border border-line bg-white px-3 text-sm font-medium text-ink hover:bg-canvas"

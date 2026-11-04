@@ -25,7 +25,7 @@ const LEAD_LIMIT = 200;
 
 export default async function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const profile = await requireRole(["super_admin", "ops_manager"]);
+  const profile = await requireRole(["super_admin", "ops_manager", "data_manager"]);
   const ws = profile.workspace_id;
   const workspace = await getCurrentWorkspace();
   const screeningRequired = workspace.require_screening;
@@ -168,7 +168,9 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             <div className="flex flex-wrap gap-2">
               <LeadImporterDialog
                 label="Upload a file"
-                isManager
+                isManager={profile.role !== "data_manager"}
+                canManageData
+                owners={assignedAgents.map((a) => ({ id: a.id, name: a.name, role: "agent" }))}
                 screeningRequired={screeningRequired}
                 initialCampaignId={campaign.id}
                 campaigns={allCampaigns ?? []}
