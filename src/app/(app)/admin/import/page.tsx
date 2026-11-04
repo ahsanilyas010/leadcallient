@@ -7,16 +7,18 @@ import { LeadImporter } from "@/components/leads/lead-importer";
 import { ScreenButton } from "@/components/leads/screen-button";
 import { EMPTY, fmtDate } from "@/lib/format";
 import { TableWrap } from "@/components/ui/data-table";
+import { loadOwnerOptions } from "@/lib/leads/owners";
 
 export const metadata: Metadata = { title: "Upload leads", robots: { index: false, follow: false } };
 
 export default async function ImportLeadsPage() {
-  const profile = await requireRole(["super_admin", "ops_manager"]);
+  const profile = await requireRole(["super_admin", "ops_manager", "data_manager"]);
+  const isManager = profile.role !== "data_manager";
   const supabase = await createRealClient();
   const ws = profile.workspace_id;
   const workspace = await getCurrentWorkspace();
 
-  const [{ data: campaigns }, { data: sources }, { data: batches }] = await Promise.all([
+  const [{ data: campaigns }, { data: sources }, { data: batches }, owners] = await Promise.all([
     supabase.from("campaigns").select("id, name, country").eq("workspace_id", ws).order("name"),
     supabase.from("data_sources").select("id, name, lawful_basis").eq("workspace_id", ws).eq("is_active", true).order("name"),
     supabase
@@ -25,23 +27,33 @@ export default async function ImportLeadsPage() {
       .eq("workspace_id", ws)
       .order("created_at", { ascending: false })
       .limit(8),
+    loadOwnerOptions(supabase, ws),
   ]);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
       <div>
-        <h1 className="font-display text-2xl font-semibold text-ink">Upload leads</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 className="font-display text-2xl font-semibold text-ink">Upload leads</h1>
+          <Link href="/admin/migrate" className="text-sm font-medium text-brand-blue hover:underline">
+            Moving from another CRM? Use the migration wizard
+          </Link>
+        </div>
         <p className="mt-1 text-sm text-muted">
           Bring in a CSV or Excel file of any shape. You say what each column is (name, phone number, company, email, or anything else
           you want kept as extra information), check the result, then import. Everything you bring in is listed under{" "}
           <Link href="/admin/leads" className="font-medium text-brand-blue hover:underline">
             Leads
           </Link>
-          , where you assign it to agents, or you can call it yourself from the{" "}
-          <Link href="/dial" className="font-medium text-brand-blue hover:underline">
-            Dial workspace
-          </Link>
-          .
+          , where you assign it to agents{isManager ? (
+            <>
+              , or you can call it yourself from the{" "}
+              <Link href="/dial" className="font-medium text-brand-blue hover:underline">
+                Dial workspace
+              </Link>
+            </>
+          ) : null}
+          . Save a mapping once and the next file like it takes one click; an import can be undone for 7 days.
         </p>
       </div>
 
@@ -56,7 +68,9 @@ export default async function ImportLeadsPage() {
       ) : (
         <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
           <LeadImporter
-            isManager
+            isManager={isManager}
+            canManageData
+            owners={owners}
             screeningRequired={workspace.require_screening}
             campaigns={campaigns ?? []}
             dataSources={(sources ?? []).map((s) => ({ id: s.id, name: s.name, needsReview: s.lawful_basis === "unspecified" }))}

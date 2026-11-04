@@ -5,13 +5,21 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RealDatabase } from "@/lib/supabase/real-types";
 import { countryToRegion } from "@/lib/campaign-options";
 import { manualScreeningProvider } from "@/lib/compliance/screening";
+import { ensureOnRosters } from "./roster";
 import {
   IMPORT_LIMITS,
+  LEAD_STAGE_OPTIONS,
+  PROBLEM_FILE_MAX,
+  TAGS_PER_LEAD,
   extraColumnsOf,
+  normValue,
   normalizeHeaders,
+  splitTags,
+  suggestStage,
   validateMapping,
   type ColumnMapping,
   type ColumnPick,
+  type DuplicateMode,
   type ImportPreview,
   type ImportResult,
   type PreviewIssue,
@@ -45,12 +53,22 @@ export interface ImportContext {
 
 export interface ParsedFile {
   headers: string[];
-  rows: string[][]; // data rows only; row i is spreadsheet row i + 2
+  rows: string[][]; // data rows only
+  // Spreadsheet row number of each data row (the header is row 1). Absent:
+  // row i is spreadsheet row i + 2.
+  rowNumbers?: number[];
+  emptyRows?: number; // blank rows between data rows
 }
 
 const MANAGER_ROLES = ["super_admin", "ops_manager"];
-const IMPORT_ROLES = [...MANAGER_ROLES, "lead_gen"];
+// Everyone who may change lead data: managers and the Data-only role.
+const DATA_ADMIN_ROLES = [...MANAGER_ROLES, "data_manager"];
+const IMPORT_ROLES = [...DATA_ADMIN_ROLES, "lead_gen"];
 const isManagerRole = (role: string) => MANAGER_ROLES.includes(role);
+const isDataAdminRole = (role: string) => DATA_ADMIN_ROLES.includes(role);
+// Roles a lead can be owned by (guard_lead_assignment enforces it too).
+const OWNER_ROLES = ["agent", "team_lead", "super_admin", "ops_manager"];
+const STAGES: string[] = LEAD_STAGE_OPTIONS.map((o) => o.value);
 
 export function phoneHash(e164: string): string {
   return createHash("sha256").update(e164).digest("hex");
@@ -74,7 +92,11 @@ export function parseTabular(data: Buffer | Uint8Array, filename: string): Parse
     const wb = XLSX.read(data, { type: "buffer", raw: true, cellDates: false });
     const sheet = wb.Sheets[wb.SheetNames[0]];
     if (!sheet) throw new Error("no sheet");
-    aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, defval: "", blankrows: false });
+    // blankrows: true keeps empty rows in place, so every row keeps its real
+    // spreadsheet row number and the empty ones can be reported.
+    aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, defval: "", blankrows: true });
+    while (aoa.length > 0 && isBlankRow(aoa[0])) aoa.shift();
+    while (aoa.length > 0 && isBlankRow(aoa[aoa.length - 1])) aoa.pop();
   } catch {
     throw new ImportError("Couldn't read that file. Check it is a real .csv or .xlsx file.");
   }
@@ -82,17 +104,29 @@ export function parseTabular(data: Buffer | Uint8Array, filename: string): Parse
 
   const width = Math.max(...aoa.slice(0, 50).map((r) => r.length));
   const headers = normalizeHeaders(Array.from({ length: width }, (_, i) => aoa[0][i]));
-  const rows = aoa
-    .slice(1)
-    .map((r) => headers.map((_, i) => (r[i] === null || r[i] === undefined ? "" : String(r[i]).trim())))
-    .filter((r) => r.some((c) => c !== ""));
+  const rows: string[][] = [];
+  const rowNumbers: number[] = [];
+  let emptyRows = 0;
+  aoa.slice(1).forEach((r, i) => {
+    const cells = headers.map((_, c) => (r[c] === null || r[c] === undefined ? "" : String(r[c]).trim()));
+    if (cells.some((c) => c !== "")) {
+      rows.push(cells);
+      rowNumbers.push(i + 2);
+    } else {
+      emptyRows += 1;
+    }
+  });
   if (rows.length === 0) throw new ImportError("That file has a header row but no data rows.");
   if (rows.length > IMPORT_LIMITS.maxRows) {
     throw new ImportError(
       `That file has ${rows.length.toLocaleString("en-GB")} rows. The limit is ${IMPORT_LIMITS.maxRows.toLocaleString("en-GB")} per import: split it and import the parts one at a time.`,
     );
   }
-  return { headers, rows };
+  return { headers, rows, rowNumbers, emptyRows };
+}
+
+function isBlankRow(r: unknown[] | undefined): boolean {
+  return !r || r.every((c) => c === null || c === undefined || String(c).trim() === "");
 }
 
 // ------------------------------------------------------------ cleaning
@@ -268,6 +302,9 @@ export interface CleanRow {
   appointment: Date | null;
   lastContact: Date | null;
   custom: Record<string, string>;
+  status: string | null; // from the stage column, when mapped
+  ownerId: string | null; // from the owner column or the import's owner
+  tags: string[];
 }
 export interface PhonelessRow {
   row: number;
@@ -284,11 +321,19 @@ export interface AdoptRow {
   campaignId: string;
 }
 
+export interface UpdateRow {
+  leadId: string;
+  row: CleanRow;
+}
+
 export interface Plan {
   preview: ImportPreview;
   toImport: CleanRow[];
+  toUpdate: UpdateRow[];
   phoneless: PhonelessRow[];
   adopt: AdoptRow[];
+  // Every row that won't import, or imports with a warning (row = spreadsheet row).
+  problems: PreviewIssue[];
 }
 
 export interface PlanInput {
@@ -298,6 +343,17 @@ export interface PlanInput {
   defaultCampaignId: string; // the campaign chosen in step 1
   timezone?: string | null; // default campaign's timezone, for dates with no zone
   holdPhoneless?: boolean; // vendor imports keep name/email-only rows as contacts
+  // What to do with a row matching an existing lead (default "skip"). Only a
+  // data admin may update or duplicate.
+  duplicateMode?: DuplicateMode;
+  // Owner for every imported lead (an owner column wins for its rows).
+  assignTo?: string | null;
+  tags?: string[]; // added to every imported (or updated) lead
+  listLabel?: string | null; // the lead's list (group_label)
+  // CRM migration: a test run imports the first sampleSize rows; the full run
+  // then skips them with skipRows.
+  sampleSize?: number;
+  skipRows?: number;
 }
 
 const INVALID_CAP = 50;
@@ -309,7 +365,10 @@ const CUSTOM_VALUE_MAX = 500;
 const normCampaign = (v: string) => v.replace(/\s+/g, " ").trim().toLowerCase();
 
 export async function buildPlan(ctx: ImportContext, input: PlanInput): Promise<Plan> {
-  if (!IMPORT_ROLES.includes(ctx.role)) throw new ImportError("Only an admin, ops manager or lead gen can import leads.");
+  if (!IMPORT_ROLES.includes(ctx.role)) throw new ImportError("Only an admin, ops manager, Data-only user or lead gen can import leads.");
+  const dataAdmin = isDataAdminRole(ctx.role);
+  const mode: DuplicateMode = input.duplicateMode ?? "skip";
+  if (mode !== "skip" && !dataAdmin) throw new ImportError("Only an admin, ops manager or Data-only user can update or duplicate existing leads.");
   const check = validateMapping(input.parsed.headers, input.mapping);
   if (!check.ok) {
     throw new ImportError(Object.values(check.errors)[0] ?? "The column mapping is incomplete.");
@@ -335,6 +394,42 @@ export async function buildPlan(ctx: ImportContext, input: PlanInput): Promise<P
   const apptCol = optCol(m.appointment);
   const lastCol = optCol(m.lastContact);
   const campaignCol = optCol(m.campaign);
+  const statusCol = optCol(m.status);
+  const tagsCol = optCol(m.tags);
+  // Lead gen can't give leads an owner; for them an owner column is kept as
+  // extra information instead.
+  const ownerCol = dataAdmin ? optCol(m.owner) : undefined;
+  const ownerAsExtra = !dataAdmin ? optCol(m.owner) : undefined;
+
+  // People a lead can be handed to, for the owner column and the import's owner.
+  const owners = new Map<string, { id: string; name: string; email: string }>();
+  if (dataAdmin && (ownerCol || input.assignTo)) {
+    const { data, error } = await ctx.supabase
+      .from("profiles")
+      .select("id, full_name, email, role, is_active")
+      .eq("workspace_id", ctx.workspaceId);
+    if (error) throw new ImportError(`Couldn't load your team: ${error.message}`);
+    for (const p of data ?? []) {
+      if (p.is_active && OWNER_ROLES.includes(p.role)) owners.set(p.id, { id: p.id, name: p.full_name, email: p.email });
+    }
+  }
+  if (input.assignTo && !owners.has(input.assignTo)) {
+    throw new ImportError("The person chosen as owner can't take leads: pick an active agent, team lead or manager.");
+  }
+  const ownerMap = new Map<string, string>();
+  // Lead gen can't give leads an owner: any owner mapping is ignored for them.
+  for (const [raw, id] of Object.entries(dataAdmin ? (m.ownerMap ?? {}) : {})) {
+    if (!id) continue;
+    if (!owners.has(id)) throw new ImportError(`"${raw}" is matched to someone who can't take leads. Pick an active agent, team lead or manager.`);
+    ownerMap.set(normValue(raw), id);
+  }
+  const statusMap = new Map<string, string>();
+  for (const [raw, st] of Object.entries(m.statusMap ?? {})) {
+    if (!st) continue;
+    if (!STAGES.includes(st)) throw new ImportError(`"${st}" isn't a LeadCallient stage.`);
+    statusMap.set(normValue(raw), st);
+  }
+  const importTags = splitTags((input.tags ?? []).join(","));
 
   const byName = new Map<string, CampaignInfo>();
   for (const c of input.campaigns) if (!byName.has(normCampaign(c.name))) byName.set(normCampaign(c.name), c);
@@ -343,24 +438,40 @@ export async function buildPlan(ctx: ImportContext, input: PlanInput): Promise<P
   // under the label the admin chose (default: the column header).
   const keepExtra = m.keepExtra !== false;
   const extraCols = extraColumnsOf(input.parsed.headers, m).slice(0, CUSTOM_MAX_KEYS);
+  if (ownerAsExtra && !extraCols.some((e) => e.column === ownerAsExtra)) extraCols.push({ column: ownerAsExtra, label: "Owner" });
   const extraLabels = extraCols.map((e) => e.label);
 
   const invalid: PreviewIssue[] = [];
   let invalidCount = 0;
   const dupes: PreviewIssue[] = [];
   let dupeCount = 0;
+  const emailDupes: PreviewIssue[] = [];
+  let emailDupeCount = 0;
   const badDates: PreviewIssue[] = [];
   let badDateCount = 0;
   const unmatched: PreviewIssue[] = [];
   let unmatchedCount = 0;
   let ignoredEmails = 0;
+  const problems: PreviewIssue[] = [];
+  const problem = (row: number, value: string, reason: string) => {
+    if (problems.length < IMPORT_LIMITS.maxRows) problems.push({ row, value, reason });
+  };
   const phoneless: PhonelessRow[] = [];
   const firstSeenRow = new Map<string, number>();
+  const firstSeenEmail = new Map<string, number>();
   const unique: CleanRow[] = [];
+  const stageCounts = new Map<string, { value: string; count: number }>();
+  const ownerCounts = new Map<string, { value: string; count: number }>();
   const text = (r: string[], col: string | undefined, max: number) => at(r, col).replace(/\s+/g, " ").trim().slice(0, max) || null;
 
+  // A test run takes the first rows; the full run after it skips them.
+  const skip = Math.max(0, input.skipRows ?? 0);
+  const take = input.sampleSize && input.sampleSize > 0 ? input.sampleSize : Infinity;
+  const rowNo = (i: number) => input.parsed.rowNumbers?.[i] ?? i + 2;
+
   input.parsed.rows.forEach((r, i) => {
-    const rowNo = i + 2;
+    if (i < skip || i >= skip + take) return;
+    const row = rowNo(i);
 
     // Which campaign this row belongs to.
     let campaign = defaultCampaign;
@@ -371,8 +482,9 @@ export async function buildPlan(ctx: ImportContext, input: PlanInput): Promise<P
       else if (!m.fallbackToDefault) {
         unmatchedCount += 1;
         if (unmatched.length < INVALID_CAP) {
-          unmatched.push({ row: rowNo, value: rawCampaign, reason: "No campaign with this name in your workspace" });
+          unmatched.push({ row, value: rawCampaign, reason: "No campaign with this name in your workspace" });
         }
+        problem(row, rawCampaign, "No campaign with this name in your workspace");
         return;
       }
     }
@@ -387,6 +499,7 @@ export async function buildPlan(ctx: ImportContext, input: PlanInput): Promise<P
     let email: string | null = at(r, emailCol).trim().slice(0, 254) || null;
     if (email && !EMAIL_RE.test(email)) {
       ignoredEmails += 1;
+      problem(row, email, "Doesn't look like an email address: imported with the email left empty");
       email = null;
     }
     const custom: Record<string, string> = {};
@@ -394,6 +507,32 @@ export async function buildPlan(ctx: ImportContext, input: PlanInput): Promise<P
       const v = at(r, e.column).trim();
       if (v) custom[e.label.slice(0, CUSTOM_KEY_MAX)] = v.slice(0, CUSTOM_VALUE_MAX);
     }
+
+    // Stage and owner, from the file.
+    const rawStage = at(r, statusCol).trim();
+    if (statusCol && rawStage) {
+      const k = normValue(rawStage);
+      const c = stageCounts.get(k) ?? { value: rawStage, count: 0 };
+      c.count += 1;
+      stageCounts.set(k, c);
+    }
+    const status = rawStage ? (statusMap.get(normValue(rawStage)) ?? null) : null;
+    if (statusCol && rawStage && !status) {
+      // Unmapped stages are kept on the lead so nothing from the old system is lost.
+      custom[(m.status && "column" in m.status ? m.status.column : "Stage").slice(0, CUSTOM_KEY_MAX)] = rawStage.slice(0, CUSTOM_VALUE_MAX);
+    }
+    const rawOwner = at(r, ownerCol).trim();
+    if (ownerCol && rawOwner) {
+      const k = normValue(rawOwner);
+      const c = ownerCounts.get(k) ?? { value: rawOwner, count: 0 };
+      c.count += 1;
+      ownerCounts.set(k, c);
+    }
+    const ownerId = (rawOwner ? ownerMap.get(normValue(rawOwner)) : undefined) ?? input.assignTo ?? null;
+    if (ownerCol && rawOwner && !ownerMap.get(normValue(rawOwner))) {
+      custom["Owner"] = rawOwner.slice(0, CUSTOM_VALUE_MAX);
+    }
+    const tags = splitTags([...(tagsCol ? splitTags(at(r, tagsCol)) : []), ...importTags].join(",")).slice(0, TAGS_PER_LEAD);
 
     const rawPhone = at(r, phoneCol);
     const parsed = noPhoneColumn ? { reason: "No phone column in this file" } : toE164(rawPhone, region);
@@ -414,21 +553,34 @@ export async function buildPlan(ctx: ImportContext, input: PlanInput): Promise<P
         keep("Next step", nextStepCol, 500);
         keep("Appointment / follow-up", apptCol, 100);
         keep("Last contact", lastCol, 100);
-        phoneless.push({ row: rowNo, name, email, company, custom: held, campaignId: campaign.id, region });
+        if (tags.length > 0) held["Tags"] = tags.join(", ");
+        phoneless.push({ row, name, email, company, custom: held, campaignId: campaign.id, region });
         return;
       }
       invalidCount += 1;
-      if (invalid.length < INVALID_CAP) invalid.push({ row: rowNo, value: rawPhone, reason: parsed.reason });
+      if (invalid.length < INVALID_CAP) invalid.push({ row, value: rawPhone, reason: parsed.reason });
+      problem(row, rawPhone, parsed.reason);
       return;
     }
     const hash = phoneHash(parsed.e164);
     const first = firstSeenRow.get(hash);
-    if (first !== undefined) {
+    if (first !== undefined && mode !== "create") {
       dupeCount += 1;
-      if (dupes.length < INVALID_CAP) dupes.push({ row: rowNo, value: parsed.e164, reason: `Same number as row ${first}` });
+      if (dupes.length < INVALID_CAP) dupes.push({ row, value: parsed.e164, reason: `Same number as row ${first}` });
+      problem(row, parsed.e164, `Same number as row ${first}`);
       return;
     }
-    firstSeenRow.set(hash, rowNo);
+    if (first === undefined) firstSeenRow.set(hash, row);
+    // The same person under a second number: skipped like a repeated number.
+    const emailKey = email ? email.toLowerCase() : null;
+    const firstEmail = emailKey ? firstSeenEmail.get(emailKey) : undefined;
+    if (firstEmail !== undefined && mode !== "create") {
+      emailDupeCount += 1;
+      if (emailDupes.length < INVALID_CAP) emailDupes.push({ row, value: email ?? "", reason: `Same email as row ${firstEmail}` });
+      problem(row, email ?? "", `Same email as row ${firstEmail}`);
+      return;
+    }
+    if (emailKey && firstEmail === undefined) firstSeenEmail.set(emailKey, row);
 
     const date = (col: string | undefined, label: string): Date | null => {
       const raw = at(r, col).trim();
@@ -436,7 +588,8 @@ export async function buildPlan(ctx: ImportContext, input: PlanInput): Promise<P
       const d = parseDateTime(raw, region, tz);
       if (!d) {
         badDateCount += 1;
-        if (badDates.length < INVALID_CAP) badDates.push({ row: rowNo, value: raw, reason: `${label} isn't a date we can read` });
+        if (badDates.length < INVALID_CAP) badDates.push({ row, value: raw, reason: `${label} isn't a date we can read` });
+        problem(row, raw, `${label} isn't a date we can read: imported with the date left empty`);
         // Keep the original text so nothing in the file is lost.
         if (keepExtra && col) custom[col.slice(0, CUSTOM_KEY_MAX)] = raw.slice(0, CUSTOM_VALUE_MAX);
       }
@@ -444,7 +597,7 @@ export async function buildPlan(ctx: ImportContext, input: PlanInput): Promise<P
     };
 
     unique.push({
-      row: rowNo,
+      row,
       campaignId: campaign.id,
       campaignName: campaign.name,
       name,
@@ -459,28 +612,46 @@ export async function buildPlan(ctx: ImportContext, input: PlanInput): Promise<P
       appointment: date(apptCol, "Appointment / follow-up"),
       lastContact: date(lastCol, "Last contact"),
       custom,
+      status,
+      ownerId,
+      tags,
     });
   });
 
-  // Already in the workspace / suppressed. leadgen_known_hashes() answers for
-  // every importing role (hashes only; lead gen cannot read either table).
-  const hashes = unique.map((u) => u.hash);
-  const existing = new Set<string>();
+  // Already in the workspace (by number, then by email), in the trash, or
+  // suppressed. import_find_existing() answers for every importing role; lead
+  // ids come back only to roles that may update leads.
+  const existingByHash = new Map<string, { ids: string[]; trashed: boolean }>();
+  const existingByEmail = new Map<string, { ids: string[]; trashed: boolean }>();
   const suppressed = new Set<string>();
-  for (let i = 0; i < hashes.length; i += 500) {
-    const { data, error } = await ctx.supabase.rpc("leadgen_known_hashes", { p_hashes: hashes.slice(i, i + 500) });
+  const note = (map: Map<string, { ids: string[]; trashed: boolean }>, key: string, id: string | null, trashed: boolean) => {
+    const e = map.get(key) ?? { ids: [], trashed: true };
+    if (!trashed) {
+      e.trashed = false;
+      if (id) e.ids.push(id);
+    }
+    map.set(key, e);
+  };
+  const hashes = unique.map((u) => u.hash);
+  const emails = [...new Set(unique.map((u) => u.email?.toLowerCase()).filter((e): e is string => Boolean(e)))];
+  for (let i = 0; i < Math.max(hashes.length, emails.length); i += 500) {
+    const { data, error } = await ctx.supabase.rpc("import_find_existing", {
+      p_hashes: hashes.slice(i, i + 500),
+      p_emails: emails.slice(i, i + 500),
+    });
     if (error) throw new ImportError(`Couldn't check for existing leads: ${error.message}`);
     for (const k of data ?? []) {
-      if (!k.phone_hash) continue;
-      if (k.kind === "suppressed") suppressed.add(k.phone_hash);
-      else existing.add(k.phone_hash);
+      if (!k.match_value) continue;
+      if (k.suppressed) suppressed.add(k.match_value);
+      else if (k.match_on === "phone") note(existingByHash, k.match_value, k.lead_id, k.trashed);
+      else note(existingByEmail, k.match_value, k.lead_id, k.trashed);
     }
   }
   // Existing leads with no campaign are invisible to every campaign and the
-  // dial queue. Managers can read them, so a re-import rescues them.
+  // dial queue. Managers can read them, so a re-import (skip mode) rescues them.
   const orphans = new Map<string, string>(); // phone_hash -> lead id
-  if (isManagerRole(ctx.role) && existing.size > 0) {
-    const known = [...existing];
+  if (isManagerRole(ctx.role) && mode === "skip" && existingByHash.size > 0) {
+    const known = [...existingByHash.keys()];
     for (let i = 0; i < known.length; i += 200) {
       const { data, error } = await ctx.supabase
         .from("leads")
@@ -493,14 +664,49 @@ export async function buildPlan(ctx: ImportContext, input: PlanInput): Promise<P
     }
   }
   let alreadyInWorkspace = 0;
+  let existingEmailCount = 0;
+  let inTrash = 0;
   let suppressedCount = 0;
   const toImport: CleanRow[] = [];
+  const toUpdate: UpdateRow[] = [];
   const adopt: AdoptRow[] = [];
+  const updating = new Set<string>();
   for (const u of unique) {
-    if (suppressed.has(u.hash)) suppressedCount += 1;
-    else if (orphans.has(u.hash)) adopt.push({ leadId: orphans.get(u.hash)!, campaignId: u.campaignId });
-    else if (existing.has(u.hash)) alreadyInWorkspace += 1;
-    else toImport.push(u);
+    if (suppressed.has(u.hash)) {
+      suppressedCount += 1;
+      problem(u.row, u.phone, "On your suppression (do-not-call) list");
+      continue;
+    }
+    const byPhone = existingByHash.get(u.hash);
+    const byEmail = !byPhone && u.email ? existingByEmail.get(u.email.toLowerCase()) : undefined;
+    const match = byPhone ?? byEmail;
+    if (match && match.trashed) {
+      inTrash += 1;
+      problem(u.row, byPhone ? u.phone : (u.email ?? ""), "Matches a lead in the trash: restore it from the trash instead");
+      continue;
+    }
+    if (!match || mode === "create") {
+      toImport.push(u);
+      continue;
+    }
+    if (mode === "update") {
+      const leadId = match.ids.find((id) => !updating.has(id));
+      if (leadId) {
+        updating.add(leadId);
+        toUpdate.push({ leadId, row: u });
+      } else {
+        alreadyInWorkspace += 1;
+        problem(u.row, u.phone, "Already updated by an earlier row in this file");
+      }
+      continue;
+    }
+    if (byPhone && orphans.has(u.hash)) {
+      adopt.push({ leadId: orphans.get(u.hash)!, campaignId: u.campaignId });
+      continue;
+    }
+    alreadyInWorkspace += 1;
+    if (!byPhone) existingEmailCount += 1;
+    problem(u.row, byPhone ? u.phone : (u.email ?? ""), byPhone ? "Already a lead in your workspace (same number)" : "Already a lead in your workspace (same email)");
   }
 
   const perCampaign = new Map<string, { campaignId: string; name: string; count: number }>();
@@ -510,12 +716,23 @@ export async function buildPlan(ctx: ImportContext, input: PlanInput): Promise<P
     perCampaign.set(t.campaignId, e);
   }
 
+  // Owner suggestions: a value that matches someone's name or email.
+  const byOwnerName = new Map<string, string>();
+  for (const o of owners.values()) {
+    byOwnerName.set(normValue(o.name), o.id);
+    byOwnerName.set(normValue(o.email), o.id);
+    byOwnerName.set(normValue(o.email.split("@")[0]), o.id);
+  }
+  problems.sort((a, b) => a.row - b.row);
+
   return {
     toImport,
+    toUpdate,
     phoneless,
     adopt,
+    problems,
     preview: {
-      totalRows: input.parsed.rows.length,
+      totalRows: Math.min(input.parsed.rows.length - skip, take === Infinity ? Number.MAX_SAFE_INTEGER : take),
       willImport: toImport.length,
       adoptable: adopt.length,
       invalid,
@@ -550,8 +767,43 @@ export async function buildPlan(ctx: ImportContext, input: PlanInput): Promise<P
       })),
       country: countryToRegion(defaultCampaign.country),
       timezone: tz,
+      emptyRows: skip > 0 || take !== Infinity ? 0 : (input.parsed.emptyRows ?? 0),
+      duplicateEmailsInFile: emailDupes,
+      duplicateEmailsInFileCount: emailDupeCount,
+      duplicateMode: mode,
+      willUpdate: toUpdate.length,
+      existingByEmail: existingEmailCount,
+      inTrash,
+      stageValues: [...stageCounts.values()]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 200)
+        .map((v) => ({ ...v, suggested: suggestStage(v.value) })),
+      ownerValues: [...ownerCounts.values()]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 200)
+        .map((v) => ({ ...v, suggested: byOwnerName.get(normValue(v.value)) ?? "" })),
     },
   };
+}
+
+// Every problem row as a CSV the admin can fix and import again: the row
+// number and reason, then the row exactly as it was in the file.
+export function problemsToCsv(parsed: ParsedFile, problems: PreviewIssue[]): { csv: string; rows: number } | null {
+  if (problems.length === 0) return null;
+  const byRow = new Map<number, string[]>();
+  parsed.rows.forEach((r, i) => byRow.set(parsed.rowNumbers?.[i] ?? i + 2, r));
+  // Quote when needed; a cell that would start a spreadsheet formula gets a
+  // leading apostrophe (phone numbers like +44 7700 900123 are left alone).
+  const esc = (v: string) => {
+    const formula = /^[=+\-@\t\r]/.test(v) && !/^[+\-]?[\d\s().-]+$/.test(v);
+    const out = (formula ? "'" : "") + v;
+    return /[",\n\r]/.test(out) || formula ? `"${out.replace(/"/g, '""')}"` : out;
+  };
+  const lines = [["Row", "Problem", ...parsed.headers].map(esc).join(",")];
+  const shown = problems.slice(0, PROBLEM_FILE_MAX);
+  for (const p of shown) lines.push([String(p.row), p.reason, ...(byRow.get(p.row) ?? [])].map(esc).join(","));
+  if (problems.length > shown.length) lines.push(esc(`...and ${problems.length - shown.length} more rows not listed`));
+  return { csv: lines.join("\r\n"), rows: problems.length };
 }
 
 // ---------------------------------------------------------------- import
@@ -577,7 +829,7 @@ export interface ImportOptions extends PlanInput {
   dataSourceId?: string | null;
   batchLabel?: string; // defaults to the file name
   callMyself?: boolean; // managers only: assign to me + put me on the roster
-  screenNow?: boolean; // managers only: run the manual screening check now
+  screenNow?: boolean; // data admins only: run the manual screening check now
   // set by the caller when it already ran buildPlan (avoids doing it twice)
   plan?: Plan;
 }
@@ -585,13 +837,20 @@ export interface ImportOptions extends PlanInput {
 export async function runMappedImport(
   ctx: ImportContext,
   opts: ImportOptions,
-): Promise<ImportResult & { phonelessRows: PhonelessRow[]; preview: ImportPreview }> {
+): Promise<Omit<ImportResult, "runId" | "problemsCsv"> & { phonelessRows: PhonelessRow[]; preview: ImportPreview; problems: PreviewIssue[] }> {
   const manager = isManagerRole(ctx.role);
-  if ((opts.callMyself || opts.screenNow) && !manager) {
-    throw new ImportError("Only an admin or ops manager can screen leads or assign them to themselves.");
+  const dataAdmin = isDataAdminRole(ctx.role);
+  if (opts.callMyself && !manager) {
+    throw new ImportError("Only an admin or ops manager can assign leads to themselves to call.");
+  }
+  if (opts.screenNow && !dataAdmin) {
+    throw new ImportError("Only an admin, ops manager or Data-only user can screen leads.");
+  }
+  if (opts.callMyself && opts.assignTo) {
+    throw new ImportError("Choose either \"I will call these myself\" or an owner for the leads, not both.");
   }
   const plan = opts.plan ?? (await buildPlan(ctx, opts));
-  if (plan.toImport.length === 0 && plan.phoneless.length === 0 && plan.adopt.length === 0) {
+  if (plan.toImport.length === 0 && plan.toUpdate.length === 0 && plan.phoneless.length === 0 && plan.adopt.length === 0) {
     throw new ImportError("Nothing to import: every row was invalid, a duplicate, already in your workspace, suppressed or had an unknown campaign.");
   }
 
@@ -645,6 +904,7 @@ export async function runMappedImport(
   // 3. Batch + leads.
   let batchId = "";
   let screened = 0;
+  const listLabel = opts.listLabel?.replace(/\s+/g, " ").trim().slice(0, 80) || null;
   if (plan.toImport.length > 0) {
     const { data: batch, error: bErr } = await sb
       .from("lead_batches")
@@ -681,18 +941,30 @@ export async function runMappedImport(
           appointment_at: r.appointment ? r.appointment.toISOString() : null,
           last_contact_at: r.lastContact ? r.lastContact.toISOString() : null,
           custom: r.custom,
+          tags: r.tags,
+          group_label: listLabel,
           source: "upload",
           screening_status: "pending",
-          ...(opts.callMyself ? { assigned_to: ctx.userId, assigned_by: ctx.userId } : {}),
+          ...(r.status ? { status: r.status } : {}),
+          ...(opts.callMyself
+            ? { assigned_to: ctx.userId, assigned_by: ctx.userId }
+            : r.ownerId
+              ? { assigned_to: r.ownerId, assigned_by: ctx.userId }
+              : {}),
         }));
         const { error } = await sb.from("leads").insert(chunk);
         if (error) throw new ImportError(error.message);
       }
     } catch (e) {
-      // Managers can undo a half-finished import; lead gen cannot delete.
+      // A half-finished import is rolled back: managers delete it outright; the
+      // Data-only role (which can't delete permanently) moves it to the trash.
       if (manager) {
         await sb.from("leads").delete().eq("batch_id", batchId).eq("workspace_id", ws);
         await sb.from("lead_batches").delete().eq("id", batchId).eq("workspace_id", ws);
+      } else if (dataAdmin) {
+        const { data: half } = await sb.from("leads").select("id").eq("batch_id", batchId).eq("workspace_id", ws);
+        const ids = (half ?? []).map((l) => l.id);
+        for (let i = 0; i < ids.length; i += 5000) await sb.rpc("trash_leads", { p_ids: ids.slice(i, i + 5000) });
       }
       throw e instanceof ImportError ? e : new ImportError("The import failed part-way through.");
     }
@@ -707,6 +979,72 @@ export async function runMappedImport(
           `The leads were imported but screening failed: ${e instanceof Error ? e.message : "unknown error"}. You can screen the batch from Compliance.`,
         );
       }
+    }
+  }
+
+  // 5. "Update existing": one statement per 500 leads. Empty cells never
+  // overwrite; tags and extra information are merged.
+  let updated = 0;
+  if (plan.toUpdate.length > 0) {
+    if (!dataAdmin) throw new ImportError("Only an admin, ops manager or Data-only user can update existing leads.");
+    for (let i = 0; i < plan.toUpdate.length; i += 500) {
+      const rows = plan.toUpdate.slice(i, i + 500).map(({ leadId, row: r }) => ({
+        id: leadId,
+        full_name: r.name,
+        company_name: r.company,
+        email: r.email,
+        contact_name: r.contact,
+        website: r.website,
+        agent_notes: r.notes,
+        next_step: r.nextStep,
+        appointment_at: r.appointment ? r.appointment.toISOString() : null,
+        last_contact_at: r.lastContact ? r.lastContact.toISOString() : null,
+        status: r.status,
+        group_label: listLabel,
+        tags: r.tags.length > 0 ? r.tags : null,
+        custom: Object.keys(r.custom).length > 0 ? r.custom : null,
+        campaign_id: r.campaignId,
+        assigned_to: opts.callMyself ? ctx.userId : r.ownerId,
+      }));
+      const { data, error } = await sb.rpc("import_update_leads", { p_rows: rows as never });
+      if (error) throw new ImportError(`Some existing leads couldn't be updated: ${error.message}`);
+      updated += data ?? 0;
+    }
+  }
+
+  // 6. Owners join the rosters of the campaigns their leads are in, so the
+  // leads actually reach them (same rule as assigning from the Leads page).
+  const ownerCampaigns = new Map<string, Set<string>>();
+  for (const r of [...plan.toImport, ...plan.toUpdate.map((u) => u.row)]) {
+    if (!r.ownerId || opts.callMyself) continue;
+    const set = ownerCampaigns.get(r.ownerId) ?? new Set<string>();
+    set.add(r.campaignId);
+    ownerCampaigns.set(r.ownerId, set);
+  }
+  for (const [owner, camps] of ownerCampaigns) {
+    try {
+      await ensureOnRosters(sb, ws, owner, [...camps]);
+    } catch (e) {
+      throw new ImportError(`The leads were imported, but an owner couldn't be put on the campaign roster: ${e instanceof Error ? e.message : "unknown error"}`);
+    }
+  }
+  const ownersAssigned = opts.callMyself ? 0 : [...plan.toImport, ...plan.toUpdate.map((u) => u.row)].filter((r) => r.ownerId).length;
+  const stagesSet = [...plan.toImport, ...plan.toUpdate.map((u) => u.row)].filter((r) => r.status).length;
+
+  // 7. Campaigns set to auto-assign new leads share them out to the roster now
+  // (same rules as the Auto-assign button: screened leads, up to each agent's
+  // daily target). Lead gen's imports wait for a manager.
+  let autoAssigned = 0;
+  if (dataAdmin && plan.toImport.length > 0) {
+    const { data: auto } = await sb
+      .from("campaigns")
+      .select("id")
+      .eq("workspace_id", ws)
+      .eq("auto_assign_new", true)
+      .in("id", campaignIds);
+    for (const c of auto ?? []) {
+      const { data } = await sb.rpc("auto_assign_campaign_leads", { p_campaign_id: c.id });
+      autoAssigned += data ?? 0;
     }
   }
 
@@ -725,7 +1063,15 @@ export async function runMappedImport(
     phonelessHeld: plan.phoneless.length,
     campaignId: opts.defaultCampaignId,
     campaigns: p.campaignBreakdown,
+    updated,
+    skippedTrashed: p.inTrash,
+    skippedEmailDuplicates: p.duplicateEmailsInFileCount,
+    ownersAssigned,
+    stagesSet,
+    autoAssigned,
+    problemRows: plan.problems.length,
     phonelessRows: plan.phoneless,
     preview: p,
+    problems: plan.problems,
   };
 }

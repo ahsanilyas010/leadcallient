@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Upload } from "lucide-react";
+import { ShieldCheck, Trash2, Upload } from "lucide-react";
 import { EmptyState } from "@/components/guide/empty-state";
 import { requireProfile } from "@/lib/auth/current-profile";
 import { getCurrentWorkspace } from "@/lib/workspace/current";
@@ -14,6 +14,9 @@ import { EditSourceDialog } from "@/components/leads/edit-source-dialog";
 import { UnphonedContacts } from "./unphoned-contacts";
 import { fmtDate } from "@/lib/format";
 import { TableWrap } from "@/components/ui/data-table";
+import { UndoImportButton } from "@/components/leads/undo-import-button";
+import { loadOwnerOptions } from "@/lib/leads/owners";
+import { IMPORT_UNDO_DAYS } from "@/lib/data-delete";
 
 export const metadata: Metadata = { title: "Data" };
 
@@ -21,8 +24,10 @@ const label = (s: string) => s.replace(/_/g, " ");
 
 export default async function DataPage() {
   const profile = await requireProfile();
-  if (!["super_admin", "ops_manager", "team_lead"].includes(profile.role)) redirect("/start");
-  const canManage = ["super_admin", "ops_manager"].includes(profile.role);
+  if (!["super_admin", "ops_manager", "team_lead", "data_manager"].includes(profile.role)) redirect("/start");
+  // Managers and the Data-only role manage sources and imports; team leads look.
+  const canManage = ["super_admin", "ops_manager", "data_manager"].includes(profile.role);
+  const isManager = ["super_admin", "ops_manager"].includes(profile.role);
 
   const supabase = await createRealClient();
   const ws = profile.workspace_id;
@@ -34,6 +39,7 @@ export default async function DataPage() {
     { data: performance },
     { data: agents },
     { data: unphoned },
+    owners,
   ] = await Promise.all([
     supabase.from("data_sources").select("*").eq("workspace_id", ws).order("created_at", { ascending: false }),
     supabase.from("campaigns").select("id, name, country").eq("workspace_id", ws).order("name"),
@@ -57,7 +63,9 @@ export default async function DataPage() {
       .eq("workspace_id", ws)
       .order("created_at", { ascending: false })
       .limit(200),
+    canManage ? loadOwnerOptions(supabase, ws) : Promise.resolve([]),
   ]);
+  const undoCutoff = Date.now() - IMPORT_UNDO_DAYS * 24 * 60 * 60 * 1000;
 
   const sourceName = new Map((sources ?? []).map((s) => [s.id, s.name]));
   const campaignName = new Map((campaigns ?? []).map((c) => [c.id, c.name]));
@@ -66,6 +74,18 @@ export default async function DataPage() {
 
   return (
     <div className="p-4">
+      {canManage && (
+        <div className="mb-3 flex flex-wrap justify-end gap-2 text-sm">
+          <Link href="/admin/leads/trash" className="inline-flex items-center gap-1.5 font-medium text-brand-blue hover:underline">
+            <Trash2 className="h-4 w-4" /> Trash
+          </Link>
+          {isManager && (
+            <Link href="/admin/data/privacy" className="inline-flex items-center gap-1.5 font-medium text-brand-blue hover:underline">
+              <ShieldCheck className="h-4 w-4" /> Privacy requests
+            </Link>
+          )}
+        </div>
+      )}
       <Tabs defaultValue="sources">
         <TabsList className="mb-4">
           <TabsTrigger value="sources">Sources</TabsTrigger>
@@ -110,7 +130,9 @@ export default async function DataPage() {
               <div className="flex gap-2">
                 <LeadImporterDialog
                   label="Import vendor file"
-                  isManager
+                  isManager={isManager}
+                  canManageData
+                  owners={owners}
                   screeningRequired={workspace.require_screening}
                   campaigns={campaigns ?? []}
                   dataSources={activeSources.map((d) => ({ id: d.id, name: d.name, needsReview: d.lawful_basis === "unspecified" }))}
@@ -167,7 +189,9 @@ export default async function DataPage() {
         </TabsContent>
 
         <TabsContent value="history">
-          <p className="mb-3 text-xs text-muted">Last 30 imports, across every source.</p>
+          <p className="mb-3 text-xs text-muted">
+            Last 30 imports, across every source. {canManage ? `An import can be undone for ${IMPORT_UNDO_DAYS} days: what it created goes to the trash.` : ""}
+          </p>
           <TableWrap label="Import history">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
@@ -181,13 +205,22 @@ export default async function DataPage() {
                   <th className="px-3 py-2 font-medium">Phone-less</th>
                   <th className="px-3 py-2 font-medium">Status</th>
                   <th className="px-3 py-2 font-medium">Started</th>
+                  {canManage && (
+                    <th className="px-3 py-2 text-right font-medium">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {(runs ?? []).map((r) => (
                   <tr key={r.id} className="h-[38px] border-b border-line last:border-0">
                     <td className="px-3 py-1.5 font-medium text-ink">{sourceName.get(r.data_source_id) ?? "—"}</td>
-                    <td className="px-3 py-1.5 text-xs text-muted">{(r.params as { filename?: string } | null)?.filename ?? "—"}</td>
+                    <td className="px-3 py-1.5 text-xs text-muted">
+                      {(r.params as { filename?: string } | null)?.filename ?? "—"}
+                      {(r.params as { kind?: string } | null)?.kind === "migration" && <Badge variant="blue" className="ml-1.5">Migration</Badge>}
+                      {(r.params as { test_run?: boolean } | null)?.test_run && <Badge variant="neutral" className="ml-1.5">Test run</Badge>}
+                    </td>
                     <td className="px-3 py-1.5 text-xs text-muted">{r.campaign_id ? campaignName.get(r.campaign_id) ?? "—" : "—"}</td>
                     <td className="px-3 py-1.5 tabular text-muted">{r.records_found}</td>
                     <td className="px-3 py-1.5 tabular text-muted">{r.records_imported}</td>
@@ -196,6 +229,7 @@ export default async function DataPage() {
                     <td className="px-3 py-1.5">
                       {r.status === "complete" && <Badge variant="confirm">Complete</Badge>}
                       {r.status === "running" && <Badge variant="warning">Running</Badge>}
+                      {r.status === "undone" && <Badge variant="neutral">Undone</Badge>}
                       {r.status === "failed" && (
                         <span title={r.error ?? ""}>
                           <Badge variant="danger">Failed</Badge>
@@ -203,11 +237,18 @@ export default async function DataPage() {
                       )}
                     </td>
                     <td className="px-3 py-1.5 tabular text-xs text-muted">{new Date(r.started_at).toLocaleString()}</td>
+                    {canManage && (
+                      <td className="px-3 py-1.5 text-right">
+                        {r.status === "complete" && Date.parse(r.finished_at ?? r.started_at) > undoCutoff && (r.records_imported > 0 || r.records_unphoned > 0) && (
+                          <UndoImportButton runId={r.id} label={(r.params as { filename?: string } | null)?.filename ?? "this file"} />
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
                 {(runs ?? []).length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-3 py-8 text-center text-sm text-muted">
+                    <td colSpan={canManage ? 10 : 9} className="px-3 py-8 text-center text-sm text-muted">
                       No imports yet.
                     </td>
                   </tr>
