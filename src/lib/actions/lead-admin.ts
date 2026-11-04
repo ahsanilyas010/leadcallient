@@ -7,11 +7,14 @@ import { createRealClient } from "@/lib/supabase/real";
 import { ensureOnRosters } from "@/lib/leads/roster";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RealDatabase } from "@/lib/supabase/real-types";
+import { LEAD_STATUSES } from "@/lib/lead-status";
+import { splitTags } from "@/lib/leads/mapped-import-shared";
 
-// Bulk actions behind the Leads page (/admin/leads): the super admin picks any
-// of the uploaded rows and hands them to an agent, screens them, or moves them
-// into a campaign. Every statement is scoped to the caller's workspace and the
-// manager-only RLS policies on leads / unphoned_contacts still apply.
+// Bulk actions behind the Leads page (/admin/leads): pick any of the uploaded
+// rows and hand them to an agent, screen them, move them into a campaign, or
+// edit their tags, list and stage. Managers and the Data-only role can; every
+// statement is scoped to the caller's workspace and row-level security still
+// applies.
 
 export interface BulkResult {
   error?: string;
@@ -20,7 +23,8 @@ export interface BulkResult {
   rostered?: number;
 }
 
-const MANAGERS = ["super_admin", "ops_manager"];
+// Everyone who may change lead data: managers and the Data-only role.
+const MANAGERS = ["super_admin", "ops_manager", "data_manager"];
 const uuid = z.string().uuid();
 const MAX_IDS = 2000;
 
@@ -172,4 +176,62 @@ export async function bulkAssignContacts(contactIds: string[], userId: string | 
   }
   touch();
   return { ok: true, count: data.length, rostered };
+}
+
+export interface BulkEdit {
+  addTags?: string; // comma-separated
+  removeTags?: string; // comma-separated
+  list?: string | null; // undefined: leave; "" or null: clear; text: set
+  status?: string; // a LeadStatus; undefined: leave
+}
+
+// Bulk edit: add or remove tags, set or clear the list, set the stage. One
+// statement per change type; tags are merged so nothing else on the lead moves.
+export async function bulkEditLeads(leadIds: string[], edit: BulkEdit): Promise<BulkResult> {
+  const profile = await requireManager();
+  if (!profile) return { error: "Only an admin, ops manager or Data-only user can edit leads." };
+  const ids = cleanIds(leadIds);
+  if (!ids) return { error: "Pick at least one lead (up to 2,000 at a time)." };
+  const add = splitTags(edit.addTags ?? "");
+  const remove = new Set(splitTags(edit.removeTags ?? "").map((t) => t.toLowerCase()));
+  const setList = edit.list !== undefined;
+  const list = (edit.list ?? "").replace(/\s+/g, " ").trim().slice(0, 80) || null;
+  if (edit.status !== undefined && !(LEAD_STATUSES as readonly string[]).includes(edit.status)) return { error: "Unknown stage." };
+  if (add.length === 0 && remove.size === 0 && !setList && edit.status === undefined) return { error: "Choose what to change." };
+
+  const supabase = await createRealClient();
+  const ws = profile.workspace_id;
+  let count = 0;
+  if (add.length > 0 || remove.size > 0) {
+    const { data: current, error } = await supabase.from("leads").select("id, tags").in("id", ids).eq("workspace_id", ws);
+    if (error) return { error: error.message };
+    // Group leads that end up with the same tag list into one update.
+    const groups = new Map<string, string[]>();
+    for (const l of current ?? []) {
+      const next: string[] = [];
+      for (const t of [...(l.tags ?? []), ...add]) {
+        if (remove.has(t.toLowerCase()) || next.some((n) => n.toLowerCase() === t.toLowerCase())) continue;
+        next.push(t);
+      }
+      const key = JSON.stringify(next.slice(0, 30));
+      groups.set(key, [...(groups.get(key) ?? []), l.id]);
+    }
+    for (const [key, group] of groups) {
+      const { error: upErr } = await supabase.from("leads").update({ tags: JSON.parse(key) as string[] }).in("id", group).eq("workspace_id", ws);
+      if (upErr) return { error: upErr.message };
+    }
+    count = current?.length ?? 0;
+  }
+  if (setList || edit.status !== undefined) {
+    const { data, error } = await supabase
+      .from("leads")
+      .update({ ...(setList ? { group_label: list } : {}), ...(edit.status !== undefined ? { status: edit.status } : {}) })
+      .in("id", ids)
+      .eq("workspace_id", ws)
+      .select("id");
+    if (error) return { error: error.message };
+    count = Math.max(count, data?.length ?? 0);
+  }
+  touch();
+  return { ok: true, count };
 }

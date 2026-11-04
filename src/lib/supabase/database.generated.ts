@@ -3137,6 +3137,10 @@ export type Database = {
         }
         Returns: string
       }
+      purge_all_expired_trash: {
+        Args: never
+        Returns: number
+      }
       purge_contacts: {
         Args: { p_ids: string[] }
         Returns: number

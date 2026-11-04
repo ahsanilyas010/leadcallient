@@ -100,6 +100,8 @@ const PUBLIC_PATHS = [
   "/api/leads/inbound",
   "/api/billing/webhook",
   "/api/email/unsubscribe",
+  // Scheduled job; checks its own secret.
+  "/api/cron/purge-trash",
 ];
 
 export const config = {

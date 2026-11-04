@@ -2,11 +2,16 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { STICKY_FIRST, TableWrap } from "@/components/ui/data-table";
+import { STICKY_FIRST, STICKY_LAST, TableWrap } from "@/components/ui/data-table";
 import { EMPTY, fmtDateTime } from "@/lib/format";
 import { bulkAssignContacts } from "@/lib/actions/lead-admin";
+import { purgeContacts, trashContacts } from "@/lib/actions/data-trash";
+import { DeleteRecordsDialog } from "@/components/leads/delete-records-dialog";
 import { BulkBar, customKeys, customValue, type BulkAgent } from "./bulk-bar";
 
 // unphoned_contacts rows that have not been promoted yet.
@@ -33,6 +38,8 @@ export function ContactsTable({
   nameById,
   campaignName,
   timezone,
+  canPurge,
+  trashDays,
 }: {
   rows: ContactRow[];
   total: number;
@@ -41,8 +48,12 @@ export function ContactsTable({
   nameById: Record<string, string>;
   campaignName: Record<string, string>;
   timezone: string | null;
+  canPurge: boolean;
+  trashDays: number;
 }) {
+  const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState<string[] | null>(null);
   const extraKeys = useMemo(() => customKeys(rows), [rows]);
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
   const ids = [...selected];
@@ -57,7 +68,14 @@ export function ContactsTable({
 
   return (
     <div>
-      <BulkBar count={selected.size} agents={agents} noun="contact" onAssign={(u) => bulkAssignContacts(ids, u)} onClear={() => setSelected(new Set())} />
+      <BulkBar
+        count={selected.size}
+        agents={agents}
+        noun="contact"
+        onAssign={(u) => bulkAssignContacts(ids, u)}
+        onDelete={() => setDeleting(ids)}
+        onClear={() => setSelected(new Set())}
+      />
       <TableWrap label="Contacts without a phone number">
         <table className="w-full min-w-[900px] text-sm">
           <thead>
@@ -77,6 +95,9 @@ export function ContactsTable({
                 </th>
               ))}
               <th className="px-3 py-2 font-medium">Added</th>
+              <th className={`${STICKY_LAST} bg-canvas px-3 py-2 text-right font-medium`}>
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -112,12 +133,23 @@ export function ContactsTable({
                     );
                   })}
                   <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted">{fmtDateTime(c.created_at, timezone)}</td>
+                  <td className={`${STICKY_LAST} px-2 py-1 text-right`}>
+                    <button
+                      type="button"
+                      onClick={() => setDeleting([c.id])}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-danger-tint hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
+                      aria-label={`Delete ${c.full_name || c.company_name || c.email || "contact"}`}
+                      title="Delete"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
                 </tr>
               );
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={8 + extraKeys.length} className="px-3 py-8 text-center text-sm text-muted">
+                <td colSpan={9 + extraKeys.length} className="px-3 py-8 text-center text-sm text-muted">
                   No contacts without a number match these filters.
                 </td>
               </tr>
@@ -129,6 +161,26 @@ export function ContactsTable({
         Showing {rows.length} of {total}.{total > limit ? ` Only the newest ${limit} are listed.` : ""} The assigned agent adds the number from
         their call sheet; the contact then becomes a lead pending screening.
       </p>
+      <DeleteRecordsDialog
+        open={deleting !== null}
+        onOpenChange={(o) => !o && setDeleting(null)}
+        count={deleting?.length ?? 0}
+        noun="contact"
+        canPurge={canPurge}
+        trashDays={trashDays}
+        onTrash={() => trashContacts(deleting ?? [])}
+        onPurge={(word) => purgeContacts(deleting ?? [], word)}
+        onDone={(r, permanent) => {
+          toast.success(
+            permanent
+              ? `Deleted ${r.count ?? 0} contact${r.count === 1 ? "" : "s"} permanently.`
+              : `Moved ${r.count ?? 0} contact${r.count === 1 ? "" : "s"} to the trash.`,
+          );
+          setSelected(new Set());
+          setDeleting(null);
+          router.refresh();
+        }}
+      />
     </div>
   );
 }
