@@ -9,6 +9,7 @@ import { deactivateUser, reactivateUser } from "@/lib/actions/deactivate";
 import { deleteUser } from "@/lib/actions/delete-user";
 import { AssignToCampaignDialog } from "./assign-campaign-dialog";
 import { EditUserDialog, type EditableUser } from "./edit-user-dialog";
+import { SeatLimitDialog } from "./seat-limit-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +38,7 @@ export function PeopleRowActions({
   campaigns,
   teams,
   seatsLeft,
+  seatLimit,
   isSuperAdmin,
   editable,
 }: {
@@ -49,6 +51,7 @@ export function PeopleRowActions({
   campaigns: { id: string; name: string; code?: string | null }[];
   teams: { id: string; name: string }[];
   seatsLeft: number;
+  seatLimit: number;
   isSuperAdmin: boolean;
   editable: EditableUser;
 }) {
@@ -57,6 +60,7 @@ export function PeopleRowActions({
   const [resetOpen, setResetOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [seatLimitOpen, setSeatLimitOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [state, formAction] = useActionState(resetPassword, initialState);
   const [confirmed, setConfirmed] = useState(false);
@@ -99,6 +103,10 @@ export function PeopleRowActions({
             <DropdownMenuItem
               onSelect={async () => {
                 const res = await reactivateUser(userId);
+                if (res.seatLimit) {
+                  setSeatLimitOpen(true);
+                  return;
+                }
                 if (res.error) toast.error(res.error);
                 else toast.success(`${userName} reactivated.`);
                 router.refresh();
@@ -118,11 +126,14 @@ export function PeopleRowActions({
         </DropdownMenuContent>
       </DropdownMenu>
 
+      <SeatLimitDialog open={seatLimitOpen} onOpenChange={setSeatLimitOpen} seatLimit={seatLimit} isSuperAdmin={isSuperAdmin} />
+
       {editOpen && (
         <EditUserDialog
           user={editable}
           teams={teams}
           seatsLeft={seatsLeft}
+          seatLimit={seatLimit}
           isSuperAdmin={isSuperAdmin}
           open={editOpen}
           onOpenChange={setEditOpen}

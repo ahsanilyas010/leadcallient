@@ -43,6 +43,7 @@ export function PeopleTable({
   campaigns,
   canManage,
   seatsLeft,
+  seatLimit,
   isSuperAdmin,
   viewerTimezone,
   zoomConnected,
@@ -52,6 +53,7 @@ export function PeopleTable({
   campaigns: { id: string; name: string }[];
   canManage: boolean;
   seatsLeft: number;
+  seatLimit: number;
   isSuperAdmin: boolean;
   viewerTimezone: string;
   zoomConnected: boolean;
@@ -229,6 +231,7 @@ export function PeopleTable({
                         campaigns={p.role === "agent" ? campaigns : []}
                         teams={teams}
                         seatsLeft={seatsLeft}
+                        seatLimit={seatLimit}
                         isSuperAdmin={isSuperAdmin}
                         editable={{
                           id: p.id,

@@ -3,13 +3,13 @@
 import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Copy, Check, Loader2, UserPlus, ShieldAlert } from "lucide-react";
 import { createUser, type CreateUserResult } from "@/lib/actions/users";
 import { BRAND } from "@/lib/brand";
 import { isValidTimezone } from "@/lib/timezones";
 import { Req, RoleField, TeamField, TimezoneField } from "./user-fields";
+import { SeatLimitDialog } from "./seat-limit-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +41,7 @@ type DialogProps = {
   // Agent seats still free, emails already in this workspace, and whether the
   // signed-in admin may mint another super admin / open billing.
   seatsLeft: number;
+  seatLimit: number;
   existingEmails: string[];
   isSuperAdmin: boolean;
   label?: string;
@@ -70,6 +71,7 @@ function CreateUserDialogRound({
   teams,
   clients,
   seatsLeft,
+  seatLimit,
   existingEmails,
   isSuperAdmin,
   label = "Create user",
@@ -92,7 +94,14 @@ function CreateUserDialogRound({
   const [clientId, setClientId] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [seatLimitOpen, setSeatLimitOpen] = useState(false);
   const router = useRouter();
+
+  // The server is the final word on seats (another admin may have filled the
+  // last one meanwhile): its refusal opens the same popup.
+  useEffect(() => {
+    if (state.seatLimit) setSeatLimitOpen(true);
+  }, [state]);
 
   useEffect(() => {
     if (!openEvent) return;
@@ -143,7 +152,15 @@ function CreateUserDialogRound({
                   One login per human. The system generates the password.
                 </DialogDescription>
               </DialogHeader>
-              <form action={formAction} className="flex flex-col gap-3">
+              <form
+                action={formAction}
+                className="flex flex-col gap-3"
+                onSubmit={(e) => {
+                  if (!noSeat) return;
+                  e.preventDefault();
+                  setSeatLimitOpen(true);
+                }}
+              >
                 <p className="text-xs text-muted">
                   Fields marked <span aria-hidden>*</span> are required.
                 </p>
@@ -219,7 +236,7 @@ function CreateUserDialogRound({
                   </div>
                 )}
                 <AnimatePresence>
-                  {state.error && (
+                  {state.error && !state.seatLimit && (
                     <motion.p
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
@@ -235,19 +252,7 @@ function CreateUserDialogRound({
                   <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
                     Cancel
                   </Button>
-                  {noSeat ? (
-                    isSuperAdmin ? (
-                      <Button asChild>
-                        <Link href="/admin/billing">Upgrade to add</Link>
-                      </Button>
-                    ) : (
-                      <Button type="button" disabled>
-                        No seats left: ask a super admin
-                      </Button>
-                    )
-                  ) : (
-                    <SubmitButton disabled={blocked} />
-                  )}
+                  <SubmitButton disabled={blocked} />
                 </DialogFooter>
               </form>
             </motion.div>
@@ -307,6 +312,7 @@ function CreateUserDialogRound({
           )}
         </AnimatePresence>
       </DialogContent>
+      <SeatLimitDialog open={seatLimitOpen} onOpenChange={setSeatLimitOpen} seatLimit={seatLimit} isSuperAdmin={isSuperAdmin} />
     </Dialog>
   );
 }
