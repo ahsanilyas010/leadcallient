@@ -15,7 +15,7 @@ import { LeadRowActions } from "./lead-row-actions";
 import { AutoAssignButton } from "./auto-assign-button";
 import { SendEmailButton } from "./send-email-button";
 import { ManageAgentsDialog } from "./manage-agents-dialog";
-import { ActivateToggle } from "./activate-toggle";
+import { CampaignToggles } from "./campaign-toggles";
 import { LeadDetailsDialog } from "./lead-details-dialog";
 import { EditCampaignDialog } from "./edit-campaign-dialog";
 import { EMPTY, plural } from "@/lib/format";
@@ -28,7 +28,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   const profile = await requireRole(["super_admin", "ops_manager", "data_manager"]);
   const ws = profile.workspace_id;
   const workspace = await getCurrentWorkspace();
-  const screeningRequired = workspace.require_screening;
+  const workspaceScreening = workspace.require_screening;
 
   const supabase = await createRealClient();
   const { data: campaign } = await supabase
@@ -38,6 +38,8 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
     .eq("workspace_id", ws)
     .maybeSingle();
   if (!campaign) notFound();
+  // The campaign's own screening rule, or the workspace's when it has none.
+  const screeningRequired = campaign.require_screening ?? workspaceScreening;
 
   const [
     { data: leads },
@@ -144,9 +146,17 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             }}
           />
           <ManageAgentsDialog campaignId={campaign.id} assigned={assignedAgents} roster={rosterOptions} />
-          {campaign.status !== "archived" && <ActivateToggle campaignId={campaign.id} isActive={isActive} />}
         </div>
       </div>
+
+      <CampaignToggles
+        campaignId={campaign.id}
+        isActive={isActive}
+        archived={campaign.status === "archived"}
+        requireScreening={campaign.require_screening}
+        workspaceRequiresScreening={workspaceScreening}
+        autoAssignNew={campaign.auto_assign_new}
+      />
 
       <Tabs defaultValue="leads">
         <TabsList className="mb-3">

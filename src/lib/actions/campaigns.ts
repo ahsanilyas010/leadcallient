@@ -269,3 +269,30 @@ export async function updateClientRecord(
   revalidatePath("/admin/campaigns", "layout");
   return { ok: true };
 }
+
+// One of a campaign's on/off settings, saved as soon as it is switched:
+// whether its leads must pass screening before dialling (null: follow the
+// workspace setting under Compliance), and whether new leads imported into it
+// are shared out to its roster automatically.
+export async function setCampaignSetting(
+  campaignId: string,
+  setting: "require_screening" | "auto_assign_new",
+  value: boolean | null,
+): Promise<{ error?: string }> {
+  const profile = await requireProfile();
+  if (!CAMPAIGN_ROLES.includes(profile.role)) return { error: "Only an admin, ops manager or Data-only user can change campaign settings." };
+  if (!z.string().uuid().safeParse(campaignId).success) return { error: "Campaign not found." };
+  if (setting === "auto_assign_new" && value === null) return { error: "Choose on or off." };
+  const supabase = await createRealClient();
+  const { data, error } = await supabase
+    .from("campaigns")
+    .update(setting === "require_screening" ? { require_screening: value } : { auto_assign_new: value === true })
+    .eq("id", campaignId)
+    .eq("workspace_id", profile.workspace_id)
+    .select("id");
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) return { error: "Campaign not found." };
+  revalidatePath(`/admin/campaigns/${campaignId}`);
+  revalidatePath("/admin/settings/campaigns");
+  return {};
+}

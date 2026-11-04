@@ -203,6 +203,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           timezone={profile.timezone}
           canPurge={canPurge}
           trashDays={workspace.trash_retention_days}
+          hiddenColumns={prefs.hiddenColumns?.contacts ?? []}
         />
       )}
 

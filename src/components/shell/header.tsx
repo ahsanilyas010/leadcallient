@@ -1,9 +1,11 @@
 "use client";
 
 import { worksShifts } from "@/lib/roles";
+import Link from "next/link";
+import { callbackRemindersOn, readPreferences } from "@/lib/preferences";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { LogOut, User, CalendarPlus, Menu, Search, CircleHelp, ListChecks } from "lucide-react";
+import { LogOut, User, CalendarPlus, Menu, Search, CircleHelp, ListChecks, Settings2 } from "lucide-react";
 import { useGuide } from "@/components/guide/guide-provider";
 import { signOut } from "@/lib/actions/auth";
 import { BRAND } from "@/lib/brand";
@@ -182,7 +184,11 @@ export function Header({
             </div>
             <Separator orientation="vertical" className="hidden h-5 sm:block" />
             <div data-tour="callbacks" className="flex items-center">
-              <FollowupTray userId={profile.id} initial={initialCallbacks} />
+              <FollowupTray
+                userId={profile.id}
+                initial={initialCallbacks}
+                remind={callbackRemindersOn(readPreferences((profile as { preferences?: unknown }).preferences))}
+              />
             </div>
             <Separator orientation="vertical" className="hidden h-5 lg:block" />
           </>
@@ -220,6 +226,11 @@ export function Header({
                 <CalendarPlus className="mr-2 h-3.5 w-3.5" /> Request leave
               </DropdownMenuItem>
             )}
+            <DropdownMenuItem asChild>
+              <Link href="/account">
+                <Settings2 className="mr-2 h-3.5 w-3.5" /> My settings
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               variant="danger"

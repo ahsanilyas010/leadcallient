@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Bell, Clock, Check, AlarmClock, X } from "lucide-react";
@@ -15,9 +15,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { fmtDateTime } from "@/lib/format";
 
-export function FollowupTray({ userId, initial }: { userId: string; initial: CallbackRow[] }) {
+// remind: show an in-app reminder when one of my callbacks falls due (the
+// "Callback reminders" setting under My settings; on unless switched off).
+export function FollowupTray({ userId, initial, remind = true }: { userId: string; initial: CallbackRow[]; remind?: boolean }) {
   const [followups, setFollowups] = useState(initial);
   const router = useRouter();
+  // Callbacks already reminded about in this tab, so each is announced once.
+  const reminded = useRef<Set<string>>(new Set());
 
   async function refresh() {
     setFollowups(await getMyCallbacks());
@@ -42,6 +46,30 @@ export function FollowupTray({ userId, initial }: { userId: string; initial: Cal
       clearInterval(interval);
     };
   }, [userId]);
+
+  // Check every 20 seconds for callbacks that have just come due.
+  useEffect(() => {
+    if (!remind) return;
+    const check = () => {
+      const now = Date.now();
+      for (const f of followups) {
+        const due = Date.parse(f.due_at);
+        // Due now, or in the next minute; ones overdue by more than a day were
+        // missed long ago and aren't announced again.
+        if (reminded.current.has(f.id) || due > now + 60_000 || due < now - 24 * 60 * 60_000) continue;
+        reminded.current.add(f.id);
+        const who = f.leads?.full_name || f.leads?.phone_e164 || "a lead";
+        toast(`Callback due: ${who}`, {
+          description: `Due ${fmtDateTime(f.due_at)}. It is first in your dial queue.`,
+          duration: 15_000,
+          action: { label: "Open dial", onClick: () => router.push("/dial") },
+        });
+      }
+    };
+    check();
+    const t = setInterval(check, 20_000);
+    return () => clearInterval(t);
+  }, [followups, remind, router]);
 
   const dueNow = followups.filter((f) => new Date(f.due_at) <= new Date());
 

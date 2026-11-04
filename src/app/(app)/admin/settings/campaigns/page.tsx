@@ -27,7 +27,7 @@ export default async function CampaignSettingsPage() {
     <div className="mx-auto max-w-4xl p-6">
       <h1 className="font-display text-2xl font-semibold text-ink">Campaign settings</h1>
       <p className="mt-1 text-sm text-muted">
-        Calling hours, attempts, caller ID, recording and scripts are set per campaign. Open one to change it.
+        Calling hours, attempts, caller ID, scripts, screening and auto-assign are set per campaign. Open one to change it.
       </p>
       <ul className="mt-6 flex flex-col gap-3">
         {(campaigns ?? []).map((c) => (
@@ -43,7 +43,8 @@ export default async function CampaignSettingsPage() {
               <div className="mt-0.5 text-xs text-muted">
                 {c.client_id ? (clientName.get(c.client_id) ?? "Client") : "No client"} · {c.country ? countryLabel(c.country) : "No country"} ·{" "}
                 {c.calling_window_start && c.calling_window_end ? `${c.calling_window_start.slice(0, 5)}-${c.calling_window_end.slice(0, 5)} ${c.timezone}` : "No calling window"} ·{" "}
-                {c.max_attempts} attempts · recording {c.recording_enabled ? "on" : "off"}
+                {c.max_attempts} attempts · screening {c.require_screening === null ? "follows the workspace" : c.require_screening ? "required" : "optional"} ·
+                auto-assign {c.auto_assign_new ? "on" : "off"}
               </div>
             </div>
             <Link href={`/admin/campaigns/${c.id}`} className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink hover:bg-canvas">
