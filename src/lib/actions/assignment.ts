@@ -12,7 +12,10 @@ export interface ActionResult {
   assigned?: number;
 }
 
-const MANAGER_ROLES = ["super_admin", "ops_manager"];
+// Managers and the Data-only role run campaigns and hand leads out (a Data-only
+// user can never be on a roster or own a lead themselves: the database
+// refuses both).
+const MANAGER_ROLES = ["super_admin", "ops_manager", "data_manager"];
 const uuid = z.string().uuid();
 
 async function requireManager() {
@@ -54,6 +57,9 @@ export async function assignAgentToCampaign(
 export async function removeAgentFromCampaign(campaignId: string, userId: string): Promise<ActionResult> {
   const profile = await requireManager();
   if (!profile) return { error: "Only an admin can change a campaign roster." };
+  // Taking someone off a roster also hands their unworked leads back: a
+  // manager's call (remove_agent_from_campaign checks the same).
+  if (profile.role === "data_manager") return { error: "Only an admin or ops manager can take someone off a campaign." };
   if (!uuid.safeParse(campaignId).success || !uuid.safeParse(userId).success) return { error: "Invalid request." };
 
   const supabase = await createRealClient();

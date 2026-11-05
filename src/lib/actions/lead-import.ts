@@ -10,10 +10,20 @@ import {
   buildPlan,
   loadCampaigns,
   parseTabular,
+  problemsToCsv,
   runMappedImport,
   type ImportContext,
 } from "@/lib/leads/mapped-import";
-import { IMPORT_LIMITS, type ColumnMapping, type ImportPreview, type ImportResult } from "@/lib/leads/mapped-import-shared";
+import {
+  DUPLICATE_MODES,
+  IMPORT_LIMITS,
+  splitTags,
+  type ColumnMapping,
+  type DuplicateMode,
+  type ImportPreview,
+  type ImportResult,
+} from "@/lib/leads/mapped-import-shared";
+import { CRM_SOURCES } from "@/lib/leads/crm-sources";
 
 // Server side of the mapped lead importer (src/lib/leads/mapped-import.ts).
 // Two steps, both stateless: the review step (a dry run that saves nothing)
@@ -25,12 +35,12 @@ export type ImportResponse =
   | { error: string }
   | { ok: true; result: ImportResult; campaignName: string; sourceName: string | null };
 
-const IMPORTERS = ["super_admin", "ops_manager", "lead_gen"];
+const IMPORTERS = ["super_admin", "ops_manager", "data_manager", "lead_gen"];
 const uuid = z.string().uuid();
 
 async function prepare(formData: FormData) {
   const profile = await requireRealProfile();
-  if (!IMPORTERS.includes(profile.role)) throw new ImportError("Only an admin, ops manager or lead gen can import leads.");
+  if (!IMPORTERS.includes(profile.role)) throw new ImportError("Only an admin, ops manager, Data-only user or lead gen can import leads.");
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) throw new ImportError("Choose a CSV or Excel file.");
@@ -80,7 +90,29 @@ async function prepare(formData: FormData) {
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const parsed = parseTabular(bytes, file.name);
-  return { profile, ctx, file, bytes, parsed, mapping, campaign, campaigns, timezone, source };
+
+  // Import options: what to do with existing leads, an owner, tags and a list
+  // for every lead, and (CRM migration) a test-run sample or the rows it took.
+  const modeRaw = String(formData.get("duplicate_mode") ?? "skip");
+  const duplicateMode: DuplicateMode = (DUPLICATE_MODES as readonly string[]).includes(modeRaw) ? (modeRaw as DuplicateMode) : "skip";
+  const assignToRaw = String(formData.get("assign_to") ?? "");
+  if (assignToRaw && !uuid.safeParse(assignToRaw).success) throw new ImportError("Choose who owns these leads.");
+  const assignTo = assignToRaw || null;
+  if (assignTo && !["super_admin", "ops_manager", "data_manager"].includes(profile.role)) {
+    throw new ImportError("Only an admin, ops manager or Data-only user can give imported leads an owner.");
+  }
+  const tags = splitTags(String(formData.get("tags") ?? ""));
+  const listLabel = String(formData.get("list") ?? "").replace(/\s+/g, " ").trim().slice(0, 80) || null;
+  const int = (k: string, max: number) => {
+    const n = Number(formData.get(k) ?? 0);
+    return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), max) : 0;
+  };
+  const sampleSize = int("sample_size", 500);
+  const skipRows = int("skip_rows", IMPORT_LIMITS.maxRows);
+  const crmRaw = String(formData.get("crm_source") ?? "");
+  const crmSource = CRM_SOURCES.some((c) => c.key === crmRaw) ? crmRaw : null;
+  const options = { duplicateMode, assignTo, tags, listLabel, sampleSize, skipRows };
+  return { profile, ctx, file, bytes, parsed, mapping, campaign, campaigns, timezone, source, options, crmSource };
 }
 
 function fail(e: unknown, label: string): { error: string } {
@@ -91,7 +123,7 @@ function fail(e: unknown, label: string): { error: string } {
 
 export async function previewLeadImport(formData: FormData): Promise<PreviewResponse> {
   try {
-    const { ctx, parsed, mapping, campaign, campaigns, timezone } = await prepare(formData);
+    const { ctx, parsed, mapping, campaign, campaigns, timezone, options } = await prepare(formData);
     const plan = await buildPlan(ctx, {
       parsed,
       mapping,
@@ -99,6 +131,7 @@ export async function previewLeadImport(formData: FormData): Promise<PreviewResp
       defaultCampaignId: campaign.id,
       timezone,
       holdPhoneless: true,
+      ...options,
     });
     return { ok: true, preview: plan.preview };
   } catch (e) {
@@ -106,9 +139,30 @@ export async function previewLeadImport(formData: FormData): Promise<PreviewResp
   }
 }
 
+// The review step's "Download the rows that won't import": the same dry run,
+// returned as a CSV of every problem row exactly as it was in the file.
+export async function previewProblemsCsv(formData: FormData): Promise<{ error: string } | { ok: true; csv: string | null; rows: number }> {
+  try {
+    const { ctx, parsed, mapping, campaign, campaigns, timezone, options } = await prepare(formData);
+    const plan = await buildPlan(ctx, {
+      parsed,
+      mapping,
+      campaigns,
+      defaultCampaignId: campaign.id,
+      timezone,
+      holdPhoneless: true,
+      ...options,
+    });
+    const out = problemsToCsv(parsed, plan.problems);
+    return { ok: true, csv: out?.csv ?? null, rows: out?.rows ?? 0 };
+  } catch (e) {
+    return fail(e, "previewProblemsCsv");
+  }
+}
+
 export async function runLeadImport(formData: FormData): Promise<ImportResponse> {
   try {
-    const { profile, ctx, file, bytes, parsed, mapping, campaign, campaigns, timezone, source } = await prepare(formData);
+    const { profile, ctx, file, bytes, parsed, mapping, campaign, campaigns, timezone, source, options, crmSource } = await prepare(formData);
     const callMyself = formData.get("call_myself") === "1";
     const screenNow = formData.get("screen_now") === "1";
 
@@ -126,6 +180,7 @@ export async function runLeadImport(formData: FormData): Promise<ImportResponse>
       batchLabel: `${source.name}: ${file.name}`,
       callMyself,
       screenNow,
+      ...options,
     });
 
     // Every import keeps a provenance run (shown under Data > Import history),
@@ -139,11 +194,26 @@ export async function runLeadImport(formData: FormData): Promise<ImportResponse>
         data_source_id: source.id,
         campaign_id: campaign.id,
         triggered_by: profile.id,
-        params: { filename: file.name, mapping, country: out.preview.country } as never,
+        params: {
+          filename: file.name,
+          mapping,
+          country: out.preview.country,
+          duplicate_mode: options.duplicateMode,
+          updated: out.updated,
+          ...(crmSource ? { kind: "migration", crm_source: crmSource } : {}),
+          ...(options.sampleSize ? { test_run: true, sample_size: options.sampleSize } : {}),
+          ...(options.skipRows ? { skipped_rows: options.skipRows } : {}),
+        } as never,
         records_found: out.preview.totalRows,
-        records_imported: out.imported,
+        records_imported: out.imported + out.updated,
         records_rejected:
-          out.skippedInvalid + out.skippedDuplicates + out.skippedExisting + out.skippedSuppressed + out.skippedUnknownCampaign,
+          out.skippedInvalid +
+          out.skippedDuplicates +
+          out.skippedEmailDuplicates +
+          out.skippedExisting +
+          out.skippedSuppressed +
+          out.skippedUnknownCampaign +
+          out.skippedTrashed,
         records_unphoned: out.phonelessHeld,
         batch_id: out.batchId || null,
         finished_at: new Date().toISOString(),
@@ -179,9 +249,11 @@ export async function runLeadImport(formData: FormData): Promise<ImportResponse>
     revalidatePath("/live");
     revalidatePath("/dial");
 
-    const { phonelessRows: _p, preview: _v, ...result } = out;
+    const { phonelessRows: _p, preview: _v, problems, ...rest } = out;
     void _p;
     void _v;
+    const problemFile = problemsToCsv(parsed, problems);
+    const result: ImportResult = { ...rest, runId: run?.id ?? null, problemsCsv: problemFile?.csv ?? null };
     return { ok: true, result, campaignName: campaign.name, sourceName: source.name };
   } catch (e) {
     return fail(e, "runLeadImport");

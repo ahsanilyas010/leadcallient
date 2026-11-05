@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requirePlatformAdmin } from "@/lib/auth/current-profile";
 import { createRealClient } from "@/lib/supabase/real";
-import { SuspendButton } from "./platform-actions";
+import { DataSeatsEditor, SuspendButton } from "./platform-actions";
 import { fmtSeats } from "@/lib/plan";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -21,9 +21,13 @@ export default async function PlatformDashboardPage() {
   ]);
 
   const seatsByWorkspace = new Map<string, number>();
+  const dataSeatsByWorkspace = new Map<string, number>();
   for (const p of profiles ?? []) {
     if (p.role === "agent" && p.is_active) {
       seatsByWorkspace.set(p.workspace_id, (seatsByWorkspace.get(p.workspace_id) ?? 0) + 1);
+    }
+    if (p.role === "data_manager" && p.is_active) {
+      dataSeatsByWorkspace.set(p.workspace_id, (dataSeatsByWorkspace.get(p.workspace_id) ?? 0) + 1);
     }
   }
   const statsByWorkspace = new Map((stats ?? []).map((s) => [s.workspace_id, s]));
@@ -41,6 +45,7 @@ export default async function PlatformDashboardPage() {
               <th className="px-4 py-3">Workspace</th>
               <th className="px-4 py-3">Plan</th>
               <th className="px-4 py-3">Seats used</th>
+              <th className="px-4 py-3">Data-only seats</th>
               <th className="px-4 py-3">Active today</th>
               <th className="px-4 py-3">Calls today</th>
               <th className="px-4 py-3">Status</th>
@@ -62,6 +67,10 @@ export default async function PlatformDashboardPage() {
                   <td className="px-4 py-3">
                     {seatsByWorkspace.get(w.id) ?? 0} / {fmtSeats(w.seat_limit)}
                   </td>
+                  <td className="px-4 py-3">
+                    {dataSeatsByWorkspace.get(w.id) ?? 0} / {fmtSeats(w.data_seat_limit)}{" "}
+                    {w.data_seat_limit < 2147483647 && <DataSeatsEditor workspaceId={w.id} seats={w.data_seat_limit} />}
+                  </td>
                   <td className="px-4 py-3">{s?.agents_active_today ?? 0}</td>
                   <td className="px-4 py-3">{s?.calls_today ?? 0}</td>
                   <td className="px-4 py-3 capitalize">{w.status}</td>
@@ -73,7 +82,7 @@ export default async function PlatformDashboardPage() {
             })}
             {(workspaces ?? []).length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-muted">
+                <td colSpan={8} className="px-4 py-8 text-center text-muted">
                   No workspaces yet.
                 </td>
               </tr>

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, ShieldCheck, UserPlus } from "lucide-react";
+import { Loader2, PencilLine, ShieldCheck, Trash2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { BulkResult } from "@/lib/actions/lead-admin";
 
@@ -26,6 +26,8 @@ export function BulkBar({
   onScreen,
   onMove,
   onClear,
+  onDelete,
+  onEdit,
   noun,
 }: {
   count: number;
@@ -35,6 +37,9 @@ export function BulkBar({
   onScreen?: () => Promise<BulkResult>;
   onMove?: (campaignId: string) => Promise<BulkResult>;
   onClear: () => void;
+  // Open the delete dialog / bulk edit dialog for the ticked rows.
+  onDelete?: () => void;
+  onEdit?: () => void;
   noun: string;
 }) {
   const [pending, startTransition] = useTransition();
@@ -103,6 +108,22 @@ export function BulkBar({
           </select>
           <Button size="sm" variant="secondary" disabled={disabled || !campaign} onClick={() => run("Moved", () => onMove(campaign))}>
             Move
+          </Button>
+        </>
+      )}
+      {onEdit && (
+        <>
+          <span className="mx-1 h-4 w-px bg-line" aria-hidden />
+          <Button size="sm" variant="secondary" disabled={disabled} onClick={onEdit} data-testid="bulk-edit">
+            <PencilLine className="h-3.5 w-3.5" /> Edit tags, list or stage
+          </Button>
+        </>
+      )}
+      {onDelete && (
+        <>
+          <span className="mx-1 h-4 w-px bg-line" aria-hidden />
+          <Button size="sm" variant="secondary" className="text-danger" disabled={disabled} onClick={onDelete} data-testid="bulk-delete">
+            <Trash2 className="h-3.5 w-3.5" /> Delete
           </Button>
         </>
       )}

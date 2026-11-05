@@ -24,7 +24,7 @@ const STATUS_BADGE = {
 } as const;
 
 export default async function CampaignsPage() {
-  const profile = await requireRole(["super_admin", "ops_manager"]);
+  const profile = await requireRole(["super_admin", "ops_manager", "data_manager"]);
   const supabase = await createRealClient();
 
   const [{ data: campaigns }, { data: clients }, { data: tokenRow }, { data: rosters }] =

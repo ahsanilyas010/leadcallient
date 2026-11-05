@@ -446,6 +446,7 @@ export type Database = {
       campaigns: {
         Row: {
           audience: string
+          auto_assign_new: boolean
           caller_id: string | null
           calling_window_end: string | null
           calling_window_start: string | null
@@ -460,6 +461,7 @@ export type Database = {
           name: string
           objection_notes: string | null
           recording_enabled: boolean
+          require_screening: boolean | null
           status: string
           timezone: string
           updated_at: string
@@ -468,6 +470,7 @@ export type Database = {
         }
         Insert: {
           audience?: string
+          auto_assign_new?: boolean
           caller_id?: string | null
           calling_window_end?: string | null
           calling_window_start?: string | null
@@ -482,6 +485,7 @@ export type Database = {
           name: string
           objection_notes?: string | null
           recording_enabled?: boolean
+          require_screening?: boolean | null
           status?: string
           timezone?: string
           updated_at?: string
@@ -490,6 +494,7 @@ export type Database = {
         }
         Update: {
           audience?: string
+          auto_assign_new?: boolean
           caller_id?: string | null
           calling_window_end?: string | null
           calling_window_start?: string | null
@@ -504,6 +509,7 @@ export type Database = {
           name?: string
           objection_notes?: string | null
           recording_enabled?: boolean
+          require_screening?: boolean | null
           status?: string
           timezone?: string
           updated_at?: string
@@ -881,6 +887,53 @@ export type Database = {
           },
         ]
       }
+      import_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          headers: string[]
+          id: string
+          kind: string
+          mapping: Json
+          name: string
+          source: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          headers?: string[]
+          id?: string
+          kind?: string
+          mapping?: Json
+          name: string
+          source?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          headers?: string[]
+          id?: string
+          kind?: string
+          mapping?: Json
+          name?: string
+          source?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_templates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_batches: {
         Row: {
           campaign_id: string | null
@@ -1137,6 +1190,8 @@ export type Database = {
           created_by: string | null
           custom: Json
           data_source_id: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           email: string | null
           first_name: string | null
           full_name: string | null
@@ -1155,6 +1210,8 @@ export type Database = {
           screening_status: string
           source: string | null
           status: string
+          tags: string[]
+          trash_meta: Json | null
           updated_at: string
           website: string | null
           workspace_id: string
@@ -1179,6 +1236,8 @@ export type Database = {
           created_by?: string | null
           custom?: Json
           data_source_id?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           first_name?: string | null
           full_name?: string | null
@@ -1197,6 +1256,8 @@ export type Database = {
           screening_status?: string
           source?: string | null
           status?: string
+          tags?: string[]
+          trash_meta?: Json | null
           updated_at?: string
           website?: string | null
           workspace_id: string
@@ -1221,6 +1282,8 @@ export type Database = {
           created_by?: string | null
           custom?: Json
           data_source_id?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           first_name?: string | null
           full_name?: string | null
@@ -1239,6 +1302,8 @@ export type Database = {
           screening_status?: string
           source?: string | null
           status?: string
+          tags?: string[]
+          trash_meta?: Json | null
           updated_at?: string
           website?: string | null
           workspace_id?: string
@@ -1404,6 +1469,7 @@ export type Database = {
           must_change_password: boolean
           password_set_at: string | null
           phone: string | null
+          preferences: Json
           role: Database["public"]["Enums"]["app_role"]
           team_id: string | null
           timezone: string
@@ -1422,6 +1488,7 @@ export type Database = {
           must_change_password?: boolean
           password_set_at?: string | null
           phone?: string | null
+          preferences?: Json
           role?: Database["public"]["Enums"]["app_role"]
           team_id?: string | null
           timezone?: string
@@ -1440,6 +1507,7 @@ export type Database = {
           must_change_password?: boolean
           password_set_at?: string | null
           phone?: string | null
+          preferences?: Json
           role?: Database["public"]["Enums"]["app_role"]
           team_id?: string | null
           timezone?: string
@@ -2115,6 +2183,8 @@ export type Database = {
           created_at: string
           custom: Json
           data_source_id: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           email: string | null
           external_ref: string | null
           full_name: string | null
@@ -2123,6 +2193,7 @@ export type Database = {
           promoted_at: string | null
           promoted_lead_id: string | null
           run_id: string | null
+          trash_meta: Json | null
           updated_at: string
           workspace_id: string
         }
@@ -2135,6 +2206,8 @@ export type Database = {
           created_at?: string
           custom?: Json
           data_source_id?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           external_ref?: string | null
           full_name?: string | null
@@ -2143,6 +2216,7 @@ export type Database = {
           promoted_at?: string | null
           promoted_lead_id?: string | null
           run_id?: string | null
+          trash_meta?: Json | null
           updated_at?: string
           workspace_id: string
         }
@@ -2155,6 +2229,8 @@ export type Database = {
           created_at?: string
           custom?: Json
           data_source_id?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           external_ref?: string | null
           full_name?: string | null
@@ -2163,6 +2239,7 @@ export type Database = {
           promoted_at?: string | null
           promoted_lead_id?: string | null
           run_id?: string | null
+          trash_meta?: Json | null
           updated_at?: string
           workspace_id?: string
         }
@@ -2292,11 +2369,13 @@ export type Database = {
           brand_product_name: string | null
           created_at: string
           created_by: string | null
+          data_seat_limit: number
           demo_allowed_numbers: string[]
           id: string
           is_demo: boolean
           name: string
           onboarding_step: string | null
+          ops_can_purge: boolean
           plan: Database["public"]["Enums"]["workspace_plan"]
           require_screening: boolean
           seat_limit: number
@@ -2305,6 +2384,7 @@ export type Database = {
           status: Database["public"]["Enums"]["workspace_status"]
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
+          trash_retention_days: number
           updated_at: string
         }
         Insert: {
@@ -2314,11 +2394,13 @@ export type Database = {
           brand_product_name?: string | null
           created_at?: string
           created_by?: string | null
+          data_seat_limit?: number
           demo_allowed_numbers?: string[]
           id?: string
           is_demo?: boolean
           name: string
           onboarding_step?: string | null
+          ops_can_purge?: boolean
           plan?: Database["public"]["Enums"]["workspace_plan"]
           require_screening?: boolean
           seat_limit?: number
@@ -2327,6 +2409,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["workspace_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          trash_retention_days?: number
           updated_at?: string
         }
         Update: {
@@ -2336,11 +2419,13 @@ export type Database = {
           brand_product_name?: string | null
           created_at?: string
           created_by?: string | null
+          data_seat_limit?: number
           demo_allowed_numbers?: string[]
           id?: string
           is_demo?: boolean
           name?: string
           onboarding_step?: string | null
+          ops_can_purge?: boolean
           plan?: Database["public"]["Enums"]["workspace_plan"]
           require_screening?: boolean
           seat_limit?: number
@@ -2349,6 +2434,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["workspace_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          trash_retention_days?: number
           updated_at?: string
         }
         Relationships: []
@@ -2701,6 +2787,10 @@ export type Database = {
           website: string
         }[]
       }
+      can_purge: {
+        Args: never
+        Returns: boolean
+      }
       check_rate_limit: {
         Args: {
           p_bucket: string
@@ -2732,6 +2822,8 @@ export type Database = {
           created_by: string | null
           custom: Json
           data_source_id: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           email: string | null
           first_name: string | null
           full_name: string | null
@@ -2750,6 +2842,8 @@ export type Database = {
           screening_status: string
           source: string | null
           status: string
+          tags: string[]
+          trash_meta: Json | null
           updated_at: string
           website: string | null
           workspace_id: string
@@ -2860,6 +2954,23 @@ export type Database = {
           suppressed: number
         }[]
       }
+      duplicate_lead_groups: {
+        Args: { p_limit?: number }
+        Returns: {
+          lead_count: number
+          lead_ids: string[]
+          match_on: string
+          match_value: string
+        }[]
+      }
+      erase_person: {
+        Args: { p_email: string; p_phone_hash: string; p_suppress?: boolean }
+        Returns: Json
+      }
+      find_person_data: {
+        Args: { p_email: string; p_phone_hash: string }
+        Returns: Json
+      }
       get_twilio_api_key_secret: {
         Args: { p_workspace_id: string }
         Returns: string
@@ -2871,6 +2982,28 @@ export type Database = {
       get_zoom_client_secret: {
         Args: { p_workspace_id: string }
         Returns: string
+      }
+      import_find_existing: {
+        Args: { p_emails: string[]; p_hashes: string[] }
+        Returns: {
+            lead_id: string
+            match_on: string
+            match_value: string
+            suppressed: boolean
+            trashed: boolean
+          }[]
+      }
+      import_update_leads: {
+        Args: { p_rows: Json }
+        Returns: number
+      }
+      is_data_admin: {
+        Args: never
+        Returns: boolean
+      }
+      is_data_manager: {
+        Args: never
+        Returns: boolean
       }
       is_lead_gen_or_manager: { Args: never; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
@@ -2927,6 +3060,10 @@ export type Database = {
         Args: { p_step: string; p_workspace_id: string }
         Returns: undefined
       }
+      merge_leads: {
+        Args: { p_keep: string; p_merge: string[] }
+        Returns: number
+      }
       my_campaign_ids: { Args: never; Returns: string[] }
       my_client_id: { Args: never; Returns: string }
       my_team_id: { Args: never; Returns: string }
@@ -2953,6 +3090,8 @@ export type Database = {
           created_by: string | null
           custom: Json
           data_source_id: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           email: string | null
           first_name: string | null
           full_name: string | null
@@ -2971,6 +3110,8 @@ export type Database = {
           screening_status: string
           source: string | null
           status: string
+          tags: string[]
+          trash_meta: Json | null
           updated_at: string
           website: string | null
           workspace_id: string
@@ -2981,6 +3122,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      person_recording_paths: {
+        Args: { p_email: string; p_phone_hash: string }
+        Returns: string[]
       }
       platform_set_workspace_status: {
         Args: {
@@ -3004,6 +3149,22 @@ export type Database = {
           p_phone_raw: string
         }
         Returns: string
+      }
+      purge_all_expired_trash: {
+        Args: never
+        Returns: number
+      }
+      purge_contacts: {
+        Args: { p_ids: string[] }
+        Returns: number
+      }
+      purge_expired_trash: {
+        Args: never
+        Returns: Json
+      }
+      purge_leads: {
+        Args: { p_ids: string[] }
+        Returns: number
       }
       record_call_attempt: {
         Args: {
@@ -3052,6 +3213,14 @@ export type Database = {
         Args: { p_campaign_id: string; p_user_id: string }
         Returns: number
       }
+      restore_contacts: {
+        Args: { p_ids: string[] }
+        Returns: number
+      }
+      restore_leads: {
+        Args: { p_ids: string[] }
+        Returns: number
+      }
       screen_lead_batch: {
         Args: { p_batch_id: string; p_evidence_url: string }
         Returns: number
@@ -3079,6 +3248,8 @@ export type Database = {
           created_by: string | null
           custom: Json
           data_source_id: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           email: string | null
           first_name: string | null
           full_name: string | null
@@ -3097,6 +3268,8 @@ export type Database = {
           screening_status: string
           source: string | null
           status: string
+          tags: string[]
+          trash_meta: Json | null
           updated_at: string
           website: string | null
           workspace_id: string
@@ -3147,6 +3320,57 @@ export type Database = {
         }[]
       }
       sweep_rate_limit_hits: { Args: never; Returns: undefined }
+      trash_contacts: {
+        Args: { p_ids: string[] }
+        Returns: number
+      }
+      trash_counts: {
+        Args: never
+        Returns: {
+            contacts: number
+            leads: number
+          }[]
+      }
+      trash_leads: {
+        Args: { p_ids: string[] }
+        Returns: number
+      }
+      trashed_contacts: {
+        Args: { p_limit?: number }
+        Returns: {
+            campaign_id: string
+            campaign_name: string
+            company_name: string
+            deleted_at: string
+            deleted_by: string
+            deleted_by_name: string
+            email: string
+            expires_at: string
+            full_name: string
+            id: string
+          }[]
+      }
+      trashed_leads: {
+        Args: { p_limit?: number }
+        Returns: {
+            batch_id: string
+            campaign_id: string
+            campaign_name: string
+            company_name: string
+            deleted_at: string
+            deleted_by: string
+            deleted_by_name: string
+            email: string
+            expires_at: string
+            full_name: string
+            id: string
+            phone_e164: string
+          }[]
+      }
+      undo_import: {
+        Args: { p_run_id: string }
+        Returns: Json
+      }
       update_my_lead: {
         Args: {
           p_address_line1: string
@@ -3182,6 +3406,8 @@ export type Database = {
           created_by: string | null
           custom: Json
           data_source_id: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           email: string | null
           first_name: string | null
           full_name: string | null
@@ -3200,6 +3426,8 @@ export type Database = {
           screening_status: string
           source: string | null
           status: string
+          tags: string[]
+          trash_meta: Json | null
           updated_at: string
           website: string | null
           workspace_id: string
@@ -3239,6 +3467,7 @@ export type Database = {
         | "qa_analyst"
         | "client"
         | "lead_gen"
+        | "data_manager"
       workspace_plan: "free" | "paid"
       workspace_status: "onboarding" | "active" | "suspended" | "canceled"
     }
@@ -3376,6 +3605,7 @@ export const Constants = {
         "qa_analyst",
         "client",
         "lead_gen",
+        "data_manager",
       ],
       workspace_plan: ["free", "paid"],
       workspace_status: ["onboarding", "active", "suspended", "canceled"],

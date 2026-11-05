@@ -12,6 +12,8 @@ export interface Filters {
   screening: string;
   kind: string;
   q: string;
+  tag: string;
+  list: string;
 }
 
 // Filters live in the URL so a view can be shared (e.g. the link from an
@@ -23,6 +25,8 @@ export function LeadsFilters({
   agents,
   leadTotal,
   contactTotal,
+  tags,
+  lists,
 }: {
   filters: Filters;
   campaigns: { id: string; name: string }[];
@@ -30,6 +34,8 @@ export function LeadsFilters({
   agents: { id: string; name: string; role: string }[];
   leadTotal: number;
   contactTotal: number;
+  tags: string[];
+  lists: string[];
 }) {
   const router = useRouter();
   const [q, setQ] = useState(filters.q);
@@ -111,15 +117,35 @@ export function LeadsFilters({
             <option value="expired">Expired</option>
           </select>
         )}
+        {filters.kind !== "contact" && (tags.length > 0 || filters.tag) && (
+          <select aria-label="Tag" value={filters.tag} onChange={(e) => go({ tag: e.target.value })} className={selectCls}>
+            <option value="">Any tag</option>
+            {[...new Set([...(filters.tag ? [filters.tag] : []), ...tags])].map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        )}
+        {filters.kind !== "contact" && (lists.length > 0 || filters.list) && (
+          <select aria-label="List" value={filters.list} onChange={(e) => go({ list: e.target.value })} className={selectCls}>
+            <option value="">Any list</option>
+            {[...new Set([...(filters.list ? [filters.list] : []), ...lists])].map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        )}
         <button type="submit" className="h-9 rounded-md border border-line bg-white px-3 text-sm text-ink shadow-sm hover:bg-canvas">
           Apply
         </button>
-        {(filters.batch || filters.campaign || filters.agent || filters.screening || filters.q) && (
+        {(filters.batch || filters.campaign || filters.agent || filters.screening || filters.q || filters.tag || filters.list) && (
           <button
             type="button"
             onClick={() => {
               setQ("");
-              go({ batch: "", campaign: "", agent: "", screening: "", q: "" });
+              go({ batch: "", campaign: "", agent: "", screening: "", q: "", tag: "", list: "" });
             }}
             className="text-xs text-brand-blue hover:underline"
           >

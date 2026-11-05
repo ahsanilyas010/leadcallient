@@ -9,7 +9,8 @@ import { RANGES, formatDuration, loadCallReport, parseRange, type RangeKey } fro
 
 export const metadata: Metadata = { title: "Performance", robots: { index: false, follow: false } };
 
-const MANAGER_ROLES = ["super_admin", "ops_manager", "team_lead"];
+// Data-only users see the same read-only funnel and scorecard as managers.
+const MANAGER_ROLES = ["super_admin", "ops_manager", "team_lead", "data_manager"];
 
 // Performance, by role. An agent sees their own calls and can download them.
 // Managers and team leads see the campaign funnel and the agent scorecard, and

@@ -25,6 +25,7 @@ export function RoleField({
   value,
   onChange,
   seatsLeft,
+  dataSeatsLeft = 0,
   confirmAdmin,
   onConfirmAdmin,
   canMakeSuperAdmin,
@@ -34,6 +35,7 @@ export function RoleField({
   value: string;
   onChange: (v: string) => void;
   seatsLeft: number;
+  dataSeatsLeft?: number;
   confirmAdmin: boolean;
   onConfirmAdmin: (v: boolean) => void;
   canMakeSuperAdmin: boolean;
@@ -66,10 +68,26 @@ export function RoleField({
           {info.description}{" "}
           <span
             className={`ml-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${
-              info.usesSeat ? (seatsLeft > 0 ? "bg-brand-blue-tint text-brand-blue" : "bg-danger-tint text-danger") : "bg-canvas text-muted"
+              info.usesSeat
+                ? seatsLeft > 0
+                  ? "bg-brand-blue-tint text-brand-blue"
+                  : "bg-danger-tint text-danger"
+                : info.dataSeat
+                  ? dataSeatsLeft > 0
+                    ? "bg-brand-blue-tint text-brand-blue"
+                    : "bg-danger-tint text-danger"
+                  : "bg-canvas text-muted"
             }`}
           >
-            {info.usesSeat ? (seatsLeft > 0 ? `Uses a seat · ${seatsLeft} left` : "Uses a seat · none left") : "No seat used"}
+            {info.usesSeat
+              ? seatsLeft > 0
+                ? `Uses a seat · ${seatsLeft} left`
+                : "Uses a seat · none left"
+              : info.dataSeat
+                ? dataSeatsLeft > 0
+                  ? `Uses a Data-only seat · ${dataSeatsLeft} left`
+                  : "Uses a Data-only seat · none left"
+                : "No seat used"}
           </span>
         </p>
       )}

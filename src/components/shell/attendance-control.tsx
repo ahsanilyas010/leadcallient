@@ -2,16 +2,18 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Coffee, Loader2, LogIn, LogOut, Play } from "lucide-react";
+import { Loader2, LogIn, LogOut } from "lucide-react";
 import { clockIn, clockOut, startBreak, endBreak } from "@/lib/actions/attendance-v2";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import type { RealTables } from "@/lib/supabase/real-types";
 
 type EventType = RealTables<"attendance_events">["event_type"];
 
 // The header's clock-in control. State is derived from the user's latest
-// attendance_events row: no event or clock_out = offline, break_start = on
-// break, anything else = working.
+// attendance_events row: no event or clock_out = offline, break_start = away
+// (on a break), anything else = available. While clocked in, availability is
+// an on/off switch that saves as soon as it is flipped.
 export function AttendanceControl({ initialEvent }: { initialEvent: EventType | null }) {
   const [last, setLast] = useState<EventType | null>(initialEvent);
   const [pending, startTransition] = useTransition();
@@ -44,17 +46,22 @@ export function AttendanceControl({ initialEvent }: { initialEvent: EventType | 
 
   return (
     <div className="flex items-center gap-1.5 sm:gap-2">
-      {onBreak ? (
-        <Button size="sm" onClick={() => run(endBreak, "break_end", "Back from break")} disabled={pending}>
-          {pending ? spinner : <Play className="h-3.5 w-3.5" />}
-          <span className="hidden sm:inline">End break</span>
-        </Button>
-      ) : (
-        <Button size="sm" variant="secondary" onClick={() => run(startBreak, "break_start", "On break")} disabled={pending}>
-          {pending ? spinner : <Coffee className="h-3.5 w-3.5" />}
-          <span className="hidden sm:inline">Break</span>
-        </Button>
-      )}
+      <div className="flex items-center gap-1.5 rounded-lg border border-line bg-white px-2 py-1" data-testid="availability-toggle">
+        <label htmlFor="availability" className={`text-xs font-medium ${onBreak ? "text-muted" : "text-brand-blue"}`}>
+          {pending ? spinner : onBreak ? "Away" : "Available"}
+        </label>
+        <Switch
+          id="availability"
+          checked={!onBreak}
+          disabled={pending}
+          aria-label={onBreak ? "You are away. Switch on to show as available." : "You are available. Switch off to show as away (on a break)."}
+          onCheckedChange={(available) =>
+            available
+              ? run(endBreak, "break_end", "Saved: you're available.")
+              : run(startBreak, "break_start", "Saved: you're away (on a break).")
+          }
+        />
+      </div>
       <Button size="sm" variant="secondary" onClick={() => run(clockOut, "clock_out", "Clocked out")} disabled={pending}>
         {pending ? spinner : <LogOut className="h-3.5 w-3.5" />}
         <span className="hidden sm:inline">Clock out</span>

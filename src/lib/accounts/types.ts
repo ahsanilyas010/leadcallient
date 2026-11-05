@@ -10,7 +10,7 @@
 // maps real rows onto this exact shape, so the ~40 existing CRM action
 // files and pages built against it never needed to change.
 
-export type Role = "super_admin" | "ops_manager" | "team_lead" | "agent" | "lead_gen" | "qa_analyst" | "client";
+export type Role = "super_admin" | "ops_manager" | "team_lead" | "agent" | "lead_gen" | "qa_analyst" | "client" | "data_manager";
 
 export type Plan = "free" | "paid";
 

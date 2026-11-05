@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireRole } from "@/lib/auth/current-profile";
 import { createRealClient } from "@/lib/supabase/real";
+import { getCurrentWorkspace } from "@/lib/workspace/current";
+import { readPreferences } from "@/lib/preferences";
 import { LeadsTable, type LeadRow } from "./leads-table";
 import { ContactsTable, type ContactRow } from "./contacts-table";
 import { LeadsFilters } from "./leads-filters";
@@ -20,7 +22,11 @@ const isUuid = (v: string) => /^[0-9a-f-]{36}$/i.test(v);
 const SCREENING = ["pending", "passed", "failed", "expired"];
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<Search> }) {
-  const profile = await requireRole(["super_admin", "ops_manager"]);
+  const profile = await requireRole(["super_admin", "ops_manager", "data_manager"]);
+  const workspace = await getCurrentWorkspace();
+  // Permanent delete: the super admin, and ops managers when allowed.
+  const canPurge = profile.role === "super_admin" || (profile.role === "ops_manager" && workspace.ops_can_purge);
+  const prefs = readPreferences((profile as { preferences?: unknown }).preferences);
   const sp = await searchParams;
   const batch = isUuid(one(sp.batch)) ? one(sp.batch) : "";
   const campaign = one(sp.campaign) === "none" || isUuid(one(sp.campaign)) ? one(sp.campaign) : "";
@@ -28,6 +34,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const screening = SCREENING.includes(one(sp.screening)) ? one(sp.screening) : "";
   const kind = one(sp.kind) === "contact" ? "contact" : "lead";
   const q = one(sp.q).trim().replace(/[,()%*\\]/g, " ").slice(0, 60).trim();
+  const tag = one(sp.tag).trim().slice(0, 40);
+  const list = one(sp.list).trim().slice(0, 80);
 
   const supabase = await createRealClient();
   const ws = profile.workspace_id;
@@ -44,6 +52,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   if (agent === "unassigned") leadQuery = leadQuery.is("assigned_to", null);
   else if (agent) leadQuery = leadQuery.eq("assigned_to", agent);
   if (screening) leadQuery = leadQuery.eq("screening_status", screening);
+  if (tag) leadQuery = leadQuery.contains("tags", [tag]);
+  if (list) leadQuery = leadQuery.eq("group_label", list);
   if (q) {
     const digits = q.replace(/\D/g, "");
     const parts = [`full_name.ilike.%${q}%`, `company_name.ilike.%${q}%`, `email.ilike.%${q}%`, `contact_name.ilike.%${q}%`];
@@ -72,6 +82,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
     { data: people },
     { count: contactTotal },
     { count: leadTotal },
+    { data: labelRows },
+    { data: trashCounts },
   ] = await Promise.all([
     kind === "lead" ? leadQuery : Promise.resolve({ data: [] as LeadRow[], count: 0, error: null }),
     kind === "contact" ? contactQuery : Promise.resolve({ data: [] as ContactRow[], count: 0 }),
@@ -85,14 +97,26 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
       .order("full_name"),
     supabase.from("unphoned_contacts").select("id", { count: "exact", head: true }).eq("workspace_id", ws).is("promoted_lead_id", null),
     supabase.from("leads").select("id", { count: "exact", head: true }).eq("workspace_id", ws),
+    // Tags and lists in use, for the filters and bulk edit.
+    supabase.from("leads").select("tags, group_label").eq("workspace_id", ws).order("created_at", { ascending: false }).limit(5000),
+    supabase.rpc("trash_counts"),
   ]);
+  const tagSet = new Set<string>();
+  const listSet = new Set<string>();
+  for (const r of labelRows ?? []) {
+    for (const t of r.tags ?? []) tagSet.add(t);
+    if (r.group_label) listSet.add(r.group_label);
+  }
+  const tags = [...tagSet].sort((a, b) => a.localeCompare(b)).slice(0, 300);
+  const lists = [...listSet].sort((a, b) => a.localeCompare(b)).slice(0, 300);
+  const inTrash = Number(trashCounts?.[0]?.leads ?? 0) + Number(trashCounts?.[0]?.contacts ?? 0);
 
   const agents = (people ?? []).filter((p) => p.is_active).map((p) => ({ id: p.id, name: p.full_name, role: p.role }));
   const nameById = new Map((people ?? []).map((p) => [p.id, p.full_name]));
   const campaignName = new Map((campaigns ?? []).map((c) => [c.id, c.name]));
   const batchName = new Map((batches ?? []).map((b) => [b.id, b.source ?? "Batch"]));
 
-  const filters = { batch, campaign, agent, screening, kind, q };
+  const filters = { batch, campaign, agent, screening, kind, q, tag, list };
 
   return (
     <div className="p-4">
@@ -101,10 +125,31 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           <h1 className="font-display text-xl font-semibold text-ink">Leads</h1>
           <p className="text-xs text-muted">
             {leadTotal ?? 0} lead{leadTotal === 1 ? "" : "s"} and {contactTotal ?? 0} contact{contactTotal === 1 ? "" : "s"} without a number in your
-            workspace. Every column from your files is shown here. Tick rows to assign them to an agent, screen them, or move them into a campaign.
+            workspace. Every column from your files is shown here. Tick rows to assign them to an agent, screen them, move them into a campaign,
+            edit their tags, list or stage, or delete them.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <a
+            href={`/api/leads/export?${new URLSearchParams(Object.entries(filters).filter(([, v]) => Boolean(v)) as [string, string][]).toString()}`}
+            className="inline-flex h-9 items-center justify-center rounded-lg border border-line bg-white px-3 text-sm font-medium text-ink hover:bg-canvas"
+            data-testid="export-leads"
+          >
+            Export CSV
+          </a>
+          <Link
+            href="/admin/leads/duplicates"
+            className="inline-flex h-9 items-center justify-center rounded-lg border border-line bg-white px-3 text-sm font-medium text-ink hover:bg-canvas"
+          >
+            Find duplicates
+          </Link>
+          <Link
+            href="/admin/leads/trash"
+            className="inline-flex h-9 items-center justify-center rounded-lg border border-line bg-white px-3 text-sm font-medium text-ink hover:bg-canvas"
+            data-testid="trash-link"
+          >
+            Trash{inTrash > 0 ? ` (${inTrash.toLocaleString("en-GB")})` : ""}
+          </Link>
           <Link
             href="/admin/import"
             className="inline-flex h-9 items-center justify-center rounded-lg bg-brand-blue px-4 text-sm font-medium text-white hover:brightness-110"
@@ -121,6 +166,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         agents={agents}
         leadTotal={leadTotal ?? 0}
         contactTotal={contactTotal ?? 0}
+        tags={tags}
+        lists={lists}
       />
 
       {leadErr && (
@@ -140,6 +187,10 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           campaignName={Object.fromEntries(campaignName)}
           batchName={Object.fromEntries(batchName)}
           timezone={profile.timezone}
+          canPurge={canPurge}
+          trashDays={workspace.trash_retention_days}
+          hiddenColumns={prefs.hiddenColumns?.leads ?? []}
+          lists={lists}
         />
       ) : (
         <ContactsTable
@@ -150,6 +201,9 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           nameById={Object.fromEntries(nameById)}
           campaignName={Object.fromEntries(campaignName)}
           timezone={profile.timezone}
+          canPurge={canPurge}
+          trashDays={workspace.trash_retention_days}
+          hiddenColumns={prefs.hiddenColumns?.contacts ?? []}
         />
       )}
 

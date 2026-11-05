@@ -79,4 +79,5 @@ export const DEMO_ROLE_LABEL: Record<AppRole, string> = {
   lead_gen: "Lead gen",
   qa_analyst: "QA",
   client: "Client",
+  data_manager: "Data-only",
 };

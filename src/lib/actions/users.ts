@@ -7,21 +7,23 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { generateTempPassword } from "@/lib/auth/generate-password";
 import { accounts, AccountError } from "@/lib/accounts";
 import { getCurrentWorkspace } from "@/lib/workspace/current";
-import { activeAgentCount, seatLimitMessage, seatsFull } from "@/lib/workspace/limits";
+import { activeAgentCount, activeDataSeatCount, dataSeatLimitMessage, seatLimitMessage, seatsFull } from "@/lib/workspace/limits";
 import { createRealClient } from "@/lib/supabase/real";
 import { isValidTimezone } from "@/lib/timezones";
 import { BRAND } from "@/lib/brand";
 
 export interface CreateUserResult {
   error?: string;
-  // True when the refusal is "no agent seats left": the People page opens the
-  // purchase-seats popup instead of showing the error inline.
+  // True when the refusal is "no seats left": the People page opens the
+  // purchase-seats popup instead of showing the error inline. seatKind says
+  // whether agent seats or Data-only seats ran out.
   seatLimit?: boolean;
+  seatKind?: "agent" | "data";
   tempPassword?: string;
   fullName?: string;
 }
 
-const ROLES = ["super_admin", "ops_manager", "team_lead", "agent", "lead_gen", "qa_analyst", "client"] as const;
+const ROLES = ["super_admin", "ops_manager", "team_lead", "agent", "lead_gen", "qa_analyst", "client", "data_manager"] as const;
 
 const createSchema = z.object({
   full_name: z.string().trim().min(1, "Name and email are required."),
@@ -91,7 +93,11 @@ export async function createUser(_prev: CreateUserResult, formData: FormData): P
 
   if (input.role === "agent") {
     const used = await activeAgentCount(admin, workspace.id);
-    if (seatsFull(used, workspace.seat_limit)) return { error: seatLimitMessage(workspace.seat_limit), seatLimit: true };
+    if (seatsFull(used, workspace.seat_limit)) return { error: seatLimitMessage(workspace.seat_limit), seatLimit: true, seatKind: "agent" };
+  }
+  if (input.role === "data_manager") {
+    const used = await activeDataSeatCount(admin, workspace.id);
+    if (seatsFull(used, workspace.data_seat_limit)) return { error: dataSeatLimitMessage(workspace.data_seat_limit), seatLimit: true, seatKind: "data" };
   }
 
   const agentCode = input.agent_code || (input.role === "agent" ? await nextAgentCode(workspace.id) : null);
@@ -224,6 +230,7 @@ export interface UpdateUserResult {
   error?: string;
   // See CreateUserResult.seatLimit.
   seatLimit?: boolean;
+  seatKind?: "agent" | "data";
   ok?: boolean;
 }
 
@@ -269,7 +276,10 @@ export async function updateUser(_prev: UpdateUserResult, formData: FormData): P
     if (target.role === "super_admin" && caller.role !== "super_admin") return { error: "Only a super admin can change another super admin." };
     if (input.role === "client") return { error: "Create a new client login instead: it has to be tied to a client." };
     if (input.role === "agent" && target.is_active && seatsFull(await activeAgentCount(admin, workspace.id), workspace.seat_limit)) {
-      return { error: seatLimitMessage(workspace.seat_limit), seatLimit: true };
+      return { error: seatLimitMessage(workspace.seat_limit), seatLimit: true, seatKind: "agent" };
+    }
+    if (input.role === "data_manager" && target.is_active && seatsFull(await activeDataSeatCount(admin, workspace.id), workspace.data_seat_limit)) {
+      return { error: dataSeatLimitMessage(workspace.data_seat_limit), seatLimit: true, seatKind: "data" };
     }
   } else if (target.role === "super_admin" && caller.role !== "super_admin") {
     return { error: "Only a super admin can edit another super admin." };

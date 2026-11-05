@@ -287,6 +287,40 @@ const CLIENT_STEPS: TourStep[] = [
   },
 ];
 
+// The Data-only seat: data screens only, never calling.
+const DATA_STEPS: TourStep[] = [
+  {
+    id: "leads",
+    target: "/admin/leads",
+    title: "Leads",
+    body: "Every lead and contact in one place. Filter, tag, put on lists, edit in bulk, hand to agents, export, or delete to the trash.",
+  },
+  {
+    id: "upload",
+    target: "/admin/import",
+    title: "Upload leads",
+    body: "Bring in a CSV or Excel file and match its columns. Save the mapping and the next file like it takes one click.",
+  },
+  {
+    id: "migrate",
+    target: "/admin/migrate",
+    title: "Migrate from a CRM",
+    body: "Move a whole CRM across: map stages and owners, run a small test, then the rest.",
+  },
+  {
+    id: "data",
+    target: "/admin/data",
+    title: "Data",
+    body: "Where each list came from, import history (undo an import for 7 days) and how each source performs.",
+  },
+  {
+    id: "profile",
+    target: "profile",
+    title: "Your account",
+    body: "Sign out here. Replay this tour from the help button next to it.",
+  },
+];
+
 export function tourFor(role: AppRole): TourStep[] {
   switch (role) {
     case "super_admin":
@@ -302,6 +336,8 @@ export function tourFor(role: AppRole): TourStep[] {
       return QA_STEPS;
     case "client":
       return CLIENT_STEPS;
+    case "data_manager":
+      return DATA_STEPS;
     default:
       return [];
   }

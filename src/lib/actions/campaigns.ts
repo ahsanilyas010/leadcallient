@@ -18,6 +18,9 @@ export interface CreateClientResult {
 }
 
 const MANAGER_ROLES = ["super_admin", "ops_manager"];
+// Creating and editing campaigns, and adding a client while doing so, are
+// open to the Data-only role too; editing an existing client is not.
+const CAMPAIGN_ROLES = [...MANAGER_ROLES, "data_manager"];
 
 const timeOrNull = z
   .string()
@@ -109,7 +112,7 @@ export async function createCampaign(
   formData: FormData,
 ): Promise<CreateCampaignResult> {
   const profile = await requireProfile();
-  if (!MANAGER_ROLES.includes(profile.role)) return { error: "Only an admin can create campaigns." };
+  if (!CAMPAIGN_ROLES.includes(profile.role)) return { error: "Only an admin can create campaigns." };
 
   // "+ Create a new client" in the campaign form: the client is made together
   // with the campaign. The campaign is validated first (against a stand-in client
@@ -171,7 +174,7 @@ export async function updateCampaign(
   formData: FormData,
 ): Promise<CreateCampaignResult> {
   const profile = await requireProfile();
-  if (!MANAGER_ROLES.includes(profile.role)) return { error: "Only an admin can edit campaigns." };
+  if (!CAMPAIGN_ROLES.includes(profile.role)) return { error: "Only an admin can edit campaigns." };
 
   const id = z.string().uuid().safeParse(formData.get("id"));
   if (!id.success) return { error: "Missing campaign." };
@@ -230,7 +233,7 @@ export async function createClientRecord(
   formData: FormData,
 ): Promise<CreateClientResult> {
   const profile = await requireProfile();
-  if (!MANAGER_ROLES.includes(profile.role)) return { error: "Only an admin can add clients." };
+  if (!CAMPAIGN_ROLES.includes(profile.role)) return { error: "Only an admin can add clients." };
   const parsed = clientInput(formData);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid client." };
 
@@ -265,4 +268,31 @@ export async function updateClientRecord(
 
   revalidatePath("/admin/campaigns", "layout");
   return { ok: true };
+}
+
+// One of a campaign's on/off settings, saved as soon as it is switched:
+// whether its leads must pass screening before dialling (null: follow the
+// workspace setting under Compliance), and whether new leads imported into it
+// are shared out to its roster automatically.
+export async function setCampaignSetting(
+  campaignId: string,
+  setting: "require_screening" | "auto_assign_new",
+  value: boolean | null,
+): Promise<{ error?: string }> {
+  const profile = await requireProfile();
+  if (!CAMPAIGN_ROLES.includes(profile.role)) return { error: "Only an admin, ops manager or Data-only user can change campaign settings." };
+  if (!z.string().uuid().safeParse(campaignId).success) return { error: "Campaign not found." };
+  if (setting === "auto_assign_new" && value === null) return { error: "Choose on or off." };
+  const supabase = await createRealClient();
+  const { data, error } = await supabase
+    .from("campaigns")
+    .update(setting === "require_screening" ? { require_screening: value } : { auto_assign_new: value === true })
+    .eq("id", campaignId)
+    .eq("workspace_id", profile.workspace_id)
+    .select("id");
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) return { error: "Campaign not found." };
+  revalidatePath(`/admin/campaigns/${campaignId}`);
+  revalidatePath("/admin/settings/campaigns");
+  return {};
 }

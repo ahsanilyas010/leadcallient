@@ -20,7 +20,7 @@ export type ColumnPick = { column: string } | { none: true };
 export type NamePick = ColumnPick | { first: string; last: string };
 
 // Optional targets: absent / { none: true } means "not in this file".
-export const OPTIONAL_FIELDS = ["contact", "website", "campaign", "notes", "nextStep", "appointment", "lastContact"] as const;
+export const OPTIONAL_FIELDS = ["contact", "website", "campaign", "notes", "nextStep", "appointment", "lastContact", "status", "owner", "tags"] as const;
 export type OptionalField = (typeof OPTIONAL_FIELDS)[number];
 
 export const OPTIONAL_LABELS: Record<OptionalField, string> = {
@@ -31,6 +31,9 @@ export const OPTIONAL_LABELS: Record<OptionalField, string> = {
   nextStep: "Next step",
   appointment: "Appointment / follow-up date and time",
   lastContact: "Last contact date",
+  status: "Stage / status",
+  owner: "Owner (agent)",
+  tags: "Tags",
 };
 
 export const OPTIONAL_HINTS: Record<OptionalField, string> = {
@@ -41,6 +44,9 @@ export const OPTIONAL_HINTS: Record<OptionalField, string> = {
   nextStep: "What should happen next with this lead.",
   appointment: "When to call back or meet. Common date formats are understood (2026-03-04 14:30, 04/03/2026, 4 Mar 2026).",
   lastContact: "When this person was last spoken to.",
+  status: "The lead's stage in your old system (New, Contacted, Won...). You match each value to a LeadCallient stage on the review step.",
+  owner: "Who owns the lead in your old system. You match each name to one of your agents on the review step.",
+  tags: "Labels separated by commas, semicolons or |. Each one becomes a tag you can filter and bulk-edit by.",
 };
 
 // What to do with a column that isn't mapped to a field: keep it as extra
@@ -64,6 +70,9 @@ export interface ColumnMapping {
   nextStep?: ColumnPick;
   appointment?: ColumnPick;
   lastContact?: ColumnPick;
+  status?: ColumnPick;
+  owner?: ColumnPick;
+  tags?: ColumnPick;
   // Save every column that isn't mapped above on the lead as extra
   // information (leads.custom). Default true.
   keepExtra?: boolean;
@@ -73,6 +82,61 @@ export interface ColumnMapping {
   // Rows whose campaign name matches no campaign go to the step-1 campaign
   // instead of being skipped. Default false.
   fallbackToDefault?: boolean;
+  // Stage column: raw value (normalised with normValue) -> LeadCallient
+  // status. Values not listed, or mapped to "", keep the default status.
+  statusMap?: Record<string, string>;
+  // Owner column: raw value (normalised with normValue) -> profile id. Values
+  // not listed, or mapped to "", leave the lead unassigned.
+  ownerMap?: Record<string, string>;
+}
+
+// What happens to a row whose phone number (or email) is already a lead.
+export const DUPLICATE_MODES = ["skip", "update", "create"] as const;
+export type DuplicateMode = (typeof DUPLICATE_MODES)[number];
+export const DUPLICATE_MODE_LABELS: Record<DuplicateMode, { label: string; hint: string }> = {
+  skip: { label: "Skip it", hint: "The existing lead is left as it is. Safest for lists you may have loaded before." },
+  update: {
+    label: "Update the existing lead",
+    hint: "Fills in and changes fields from the file. Empty cells never overwrite what is there; tags and extra information are added to.",
+  },
+  create: { label: "Create a new lead anyway", hint: "Keeps both. Use only when the same number really belongs to different people." },
+};
+
+// LeadCallient's lead stages, as a stage mapping offers them.
+export const LEAD_STAGE_OPTIONS = [
+  { value: "new", label: "New" },
+  { value: "contacted", label: "Contacted" },
+  { value: "qualified", label: "Qualified" },
+  { value: "converted", label: "Won / converted" },
+  { value: "rejected", label: "Lost / not interested" },
+] as const;
+
+// Raw cell values are compared case- and space-insensitively.
+export const normValue = (v: string) => v.replace(/\s+/g, " ").trim().toLowerCase();
+
+// First guess at a LeadCallient stage for a CRM stage or status name.
+export function suggestStage(raw: string): string {
+  const v = normValue(raw);
+  if (!v) return "";
+  if (/\b(won|closed ?won|customer|converted|sale|sold|signed|deal won|client)\b/.test(v)) return "converted";
+  if (/\b(lost|closed ?lost|unqualified|disqualified|not interested|junk|bad|dead|do not call|dnc|rejected|declined|recycled)\b/.test(v)) return "rejected";
+  if (/\b(qualified|interested|hot|meeting|demo|appointment|opportunity|proposal|negotiation|quote|sql|mql)\b/.test(v)) return "qualified";
+  if (/\b(contacted|attempted|working|in progress|connected|follow ?up|callback|nurturing|engaged|left message|voicemail)\b/.test(v)) return "contacted";
+  if (/\b(new|open|not contacted|fresh|lead|subscriber|prospect|untouched|unassigned)\b/.test(v)) return "new";
+  return "";
+}
+
+// Splits a tags cell ("vip, uk; spring|webinar") into clean, unique tags.
+export const TAG_MAX = 40;
+export const TAGS_PER_LEAD = 30;
+export function splitTags(raw: string): string[] {
+  const out: string[] = [];
+  for (const t of raw.split(/[,;|]/)) {
+    const c = t.replace(/\s+/g, " ").trim().slice(0, TAG_MAX);
+    if (c && !out.some((o) => o.toLowerCase() === c.toLowerCase())) out.push(c);
+    if (out.length >= TAGS_PER_LEAD) break;
+  }
+  return out;
 }
 
 export interface MappingCheck {
@@ -227,7 +291,16 @@ export function suggestMapping(headers: string[]): ColumnMapping {
   ]);
   if (company) out.company = { column: company };
 
-  const NOT_NAME = /\b(first|last|given|fore|sur|family|file|user|company|business|organi[sz]ation|campaign|source|product|domain|job|title|role|agent)\b/;
+  // Stage, owner and tags first, so "Contact owner" or "Lead status" isn't
+  // taken as the person's name below.
+  const status = take([/\b(lead status|deal stage|pipeline stage|lifecycle stage|status|stage)\b/]);
+  if (status) out.status = { column: status };
+  const owner = take([/\b(lead owner|contact owner|account owner|record owner|deal owner|owner|assigned to|assignee|sales rep|rep|user name)\b/]);
+  if (owner) out.owner = { column: owner };
+  const tags = take([/\b(tags?|labels?)\b/]);
+  if (tags) out.tags = { column: tags };
+
+  const NOT_NAME = /\b(first|last|given|fore|sur|family|file|user|company|business|organi[sz]ation|campaign|source|product|domain|job|title|role|agent|owner|status|stage)\b/;
   const single = take(
     [
       /^(full )?name$/,
@@ -336,6 +409,19 @@ export interface ImportPreview {
   }[];
   country: string;
   timezone: string | null;
+  // Spreadsheet rows with nothing in them (between data rows).
+  emptyRows: number;
+  // Rows whose email appears earlier in the file (and whose number was new).
+  duplicateEmailsInFile: PreviewIssue[];
+  duplicateEmailsInFileCount: number;
+  // How rows matching an existing lead are handled.
+  duplicateMode: DuplicateMode;
+  willUpdate: number; // existing leads an "update" import changes
+  existingByEmail: number; // of alreadyInWorkspace, matched on email rather than number
+  inTrash: number; // match a lead in the trash: always skipped (restore it instead)
+  // Distinct values in the stage and owner columns, for the mapping tables.
+  stageValues: { value: string; count: number; suggested: string }[];
+  ownerValues: { value: string; count: number; suggested: string }[];
 }
 
 export interface ImportResult {
@@ -353,7 +439,20 @@ export interface ImportResult {
   phonelessHeld: number;
   campaignId: string;
   campaigns: { campaignId: string; name: string; count: number }[];
+  updated: number; // existing leads changed by an "update" import
+  skippedTrashed: number;
+  skippedEmailDuplicates: number;
+  ownersAssigned: number; // leads given an owner from the file or the import's owner
+  stagesSet: number; // leads whose stage came from the file
+  autoAssigned: number; // shared out to the roster by the campaign's auto-assign
+  runId: string | null;
+  // CSV of every row that didn't import (or imported with a warning), capped.
+  problemsCsv: string | null;
+  problemRows: number;
 }
+
+// Rows in the problems file, at most.
+export const PROBLEM_FILE_MAX = 5000;
 
 // ------------------------------------------------------------ column roles
 //
@@ -385,6 +484,9 @@ export const ROLE_LABELS: Record<ColumnRole, string> = {
   nextStep: "Next step",
   appointment: "Appointment / follow-up date",
   lastContact: "Last contact date",
+  status: "Stage / status",
+  owner: "Owner (agent)",
+  tags: "Tags",
   extra: "Extra information (keep as is)",
   skip: "Don't import this column",
 };
@@ -403,6 +505,9 @@ export const ROLE_ORDER: ColumnRole[] = [
   "nextStep",
   "appointment",
   "lastContact",
+  "status",
+  "owner",
+  "tags",
   "extra",
   "skip",
 ];

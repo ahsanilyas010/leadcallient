@@ -39,6 +39,8 @@ export function PeopleRowActions({
   teams,
   seatsLeft,
   seatLimit,
+  dataSeatsLeft = 0,
+  dataSeatLimit = 0,
   isSuperAdmin,
   editable,
 }: {
@@ -52,6 +54,8 @@ export function PeopleRowActions({
   teams: { id: string; name: string }[];
   seatsLeft: number;
   seatLimit: number;
+  dataSeatsLeft?: number;
+  dataSeatLimit?: number;
   isSuperAdmin: boolean;
   editable: EditableUser;
 }) {
@@ -61,6 +65,7 @@ export function PeopleRowActions({
   const [assignOpen, setAssignOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [seatLimitOpen, setSeatLimitOpen] = useState(false);
+  const [seatKind, setSeatKind] = useState<"agent" | "data">("agent");
   const [deleting, setDeleting] = useState(false);
   const [state, formAction] = useActionState(resetPassword, initialState);
   const [confirmed, setConfirmed] = useState(false);
@@ -104,6 +109,7 @@ export function PeopleRowActions({
               onSelect={async () => {
                 const res = await reactivateUser(userId);
                 if (res.seatLimit) {
+                  setSeatKind(res.seatKind ?? "agent");
                   setSeatLimitOpen(true);
                   return;
                 }
@@ -126,7 +132,13 @@ export function PeopleRowActions({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <SeatLimitDialog open={seatLimitOpen} onOpenChange={setSeatLimitOpen} seatLimit={seatLimit} isSuperAdmin={isSuperAdmin} />
+      <SeatLimitDialog
+        open={seatLimitOpen}
+        onOpenChange={setSeatLimitOpen}
+        kind={seatKind}
+        seatLimit={seatKind === "data" ? dataSeatLimit : seatLimit}
+        isSuperAdmin={isSuperAdmin}
+      />
 
       {editOpen && (
         <EditUserDialog
@@ -134,6 +146,8 @@ export function PeopleRowActions({
           teams={teams}
           seatsLeft={seatsLeft}
           seatLimit={seatLimit}
+          dataSeatsLeft={dataSeatsLeft}
+          dataSeatLimit={dataSeatLimit}
           isSuperAdmin={isSuperAdmin}
           open={editOpen}
           onOpenChange={setEditOpen}
