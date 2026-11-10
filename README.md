@@ -138,6 +138,14 @@ One-time Supabase setup (Dashboard → Authentication):
 3. The built-in Supabase mailer sends only a few emails per hour. That is
    enough for two owners; add custom SMTP under **SMTP Settings** if you hit it.
 
+**If the PIN email can't be delivered** (Supabase's built-in mailer is
+rate-limited, or email isn't set up yet), set `OWNER_ACCESS_TOKEN` on the
+deployment to a random string of at least 32 characters
+(`openssl rand -hex 24`) and redeploy. `/platform/login/access` then signs in
+the first owner on the allowlist with that token, with no email. It grants
+exactly what the PIN does, is rate-limited and audited, and is off whenever
+the variable is unset. Delete the variable once email works.
+
 The first successful PIN sign-in creates the owner's `platform_admins` row.
 `PLATFORM_ADMIN_EMAILS` is no longer needed for console access.
 
