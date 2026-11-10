@@ -1,11 +1,12 @@
 "use server";
 
+import { createHash, timingSafeEqual } from "node:crypto";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createRealClient } from "@/lib/supabase/real";
 import { createServiceClient } from "@/lib/supabase/service";
 import { checkRealRateLimit } from "@/lib/rate-limit";
-import { isOwnerEmail, normalizeEmail } from "@/lib/owner/allowlist";
+import { isOwnerEmail, normalizeEmail, OWNER_EMAILS } from "@/lib/owner/allowlist";
 import { captureException } from "@/lib/error-tracking";
 
 // Owner console sign-in: a 6-digit PIN emailed by Supabase Auth (email OTP).
@@ -94,4 +95,41 @@ export async function ownerSignOut() {
   const supabase = await createRealClient();
   await supabase.auth.signOut();
   redirect("/platform/login");
+}
+
+// Break-glass sign-in for when the email PIN can't be delivered (Supabase's
+// mailer is rate-limited, or email isn't set up yet). Off unless the
+// OWNER_ACCESS_TOKEN env var is set on the deployment (at least 32
+// characters); delete the variable to turn it off again. It signs in the
+// first owner on the allowlist without sending any email, so it grants
+// exactly what the PIN would, and nothing else. Every use is audited.
+export async function ownerAccessWithToken(_prev: OwnerPinState, formData: FormData): Promise<OwnerPinState> {
+  const secret = process.env.OWNER_ACCESS_TOKEN;
+  const given = String(formData.get("token") ?? "");
+  const ip = await clientIp();
+  if (!(await checkRealRateLimit("owner_access_token", ip, 5, 900))) {
+    return { step: "email", error: "Too many attempts. Try again in 15 minutes." };
+  }
+  const digest = (v: string) => createHash("sha256").update(v).digest();
+  const ok = !!secret && secret.length >= 32 && timingSafeEqual(digest(given), digest(secret));
+  if (!ok) return { step: "email", error: "That access token isn't valid." };
+
+  const email = OWNER_EMAILS[0];
+  try {
+    const admin = createServiceClient();
+    const { data: link, error: linkError } = await admin.auth.admin.generateLink({ type: "magiclink", email });
+    const tokenHash = link?.properties?.hashed_token;
+    if (linkError || !tokenHash) throw linkError ?? new Error("no token hash returned");
+
+    const supabase = await createRealClient();
+    const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "email" });
+    if (error || !data.user || !isOwnerEmail(data.user.email)) throw error ?? new Error("verification failed");
+
+    await admin.from("platform_admins").upsert({ id: data.user.id, email }, { onConflict: "id" });
+    await admin.from("platform_audit").insert({ actor_id: data.user.id, actor_email: email, action: "owner.sign_in", details: { ip, method: "access_token" } });
+  } catch (e) {
+    captureException(e, { where: "ownerAccessWithToken" });
+    return { step: "email", error: "We couldn't sign you in right now." };
+  }
+  redirect("/platform");
 }
