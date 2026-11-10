@@ -22,7 +22,8 @@
     "test:zoommeetings": "tsx --conditions=react-server scripts/zoom-meetings-proof.ts",
     "test:guide": "tsx --conditions=react-server scripts/guide-proof.ts",
     "test:import": "tsx --conditions=react-server scripts/import-proof.ts",
-    "test:callsheet": "tsx scripts/callsheet-proof.ts"
+    "test:callsheet": "tsx scripts/callsheet-proof.ts",
+    "test:owner": "tsx --conditions=react-server scripts/owner-console-proof.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",

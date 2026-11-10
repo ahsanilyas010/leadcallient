@@ -2,6 +2,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createRealClient } from "@/lib/supabase/real";
 import type { RealTables } from "@/lib/supabase/real-types";
+import { isOwnerEmail, OWNER_SESSION_HOURS } from "@/lib/owner/allowlist";
 
 export type Profile = RealTables<"profiles">;
 export type RealProfile = Profile;
@@ -60,23 +61,35 @@ export interface PlatformAdmin {
   full_name: string | null;
 }
 
-// Gate for the vendor's own /platform pages. Deliberately separate from
-// requireProfile() — a platform_admin has no workspace/profiles row at all,
-// by design (spec: "platform_admins is a separate table outside any
-// workspace").
-export async function requirePlatformAdmin(): Promise<PlatformAdmin> {
+// Gate for the owner console (/platform). A platform admin has no
+// workspace/profiles row, so this is deliberately separate from
+// requireProfile(). Four checks, all required:
+//   1. a valid Supabase session (getUser() verifies it with the auth server);
+//   2. the email is on the hard-coded owner allowlist (src/lib/owner/allowlist.ts);
+//   3. a platform_admins row exists (what RLS and the platform_* RPCs check);
+//   4. the session was started with an emailed PIN (OTP) within the last
+//      OWNER_SESSION_HOURS, so a password sign-in never opens the console.
+export const requireOwner = cache(async (): Promise<PlatformAdmin> => {
   const supabase = await createRealClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login?signed_out=1");
+  if (!user || !isOwnerEmail(user.email)) redirect("/platform/login");
 
-  const { data: admin } = await supabase
-    .from("platform_admins")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const amr = (claimsData?.claims?.amr ?? []) as Array<string | { method: string; timestamp: number }>;
+  const otpAt = amr
+    .map((e) => (typeof e === "string" ? null : e.method === "otp" || e.method === "magiclink" ? e.timestamp : null))
+    .filter((t): t is number => typeof t === "number")
+    .sort((a, b) => b - a)[0];
+  if (!otpAt || Date.now() / 1000 - otpAt > OWNER_SESSION_HOURS * 3600) redirect("/platform/login?expired=1");
 
-  if (!admin) redirect("/login?signed_out=1");
+  const { data: admin } = await supabase.from("platform_admins").select("*").eq("id", user.id).single();
+  if (!admin) redirect("/platform/login");
   return admin;
+});
+
+// Kept for existing callers; the owner console is the only platform surface.
+export async function requirePlatformAdmin(): Promise<PlatformAdmin> {
+  return requireOwner();
 }
