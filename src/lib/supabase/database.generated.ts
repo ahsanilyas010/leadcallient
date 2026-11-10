@@ -1456,6 +1456,108 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_audit: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          created_at: string
+          details: Json
+          id: number
+          target_user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          id?: number
+          target_user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          id?: number
+          target_user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      platform_ledger: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          id: string
+          kind: string
+          method: string | null
+          note: string | null
+          occurred_on: string
+          provider: string | null
+          provider_ref: string | null
+          reference: string | null
+          workspace_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          kind: string
+          method?: string | null
+          note?: string | null
+          occurred_on?: string
+          provider?: string | null
+          provider_ref?: string | null
+          reference?: string | null
+          workspace_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          kind?: string
+          method?: string | null
+          note?: string | null
+          occurred_on?: string
+          provider?: string | null
+          provider_ref?: string | null
+          reference?: string | null
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      platform_workspace_notes: {
+        Row: {
+          notes: string
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          notes?: string
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          notes?: string
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           agent_code: string | null
@@ -2363,6 +2465,9 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          billing_amount: number | null
+          billing_currency: string
+          billing_cycle: string
           billing_status: string
           brand_logo_url: string | null
           brand_primary_color: string | null
@@ -2374,6 +2479,7 @@ export type Database = {
           id: string
           is_demo: boolean
           name: string
+          next_due_date: string | null
           onboarding_step: string | null
           ops_can_purge: boolean
           plan: Database["public"]["Enums"]["workspace_plan"]
@@ -2385,9 +2491,13 @@ export type Database = {
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           trash_retention_days: number
+          trial_ends_at: string | null
           updated_at: string
         }
         Insert: {
+          billing_amount?: number | null
+          billing_currency?: string
+          billing_cycle?: string
           billing_status?: string
           brand_logo_url?: string | null
           brand_primary_color?: string | null
@@ -2399,6 +2509,7 @@ export type Database = {
           id?: string
           is_demo?: boolean
           name: string
+          next_due_date?: string | null
           onboarding_step?: string | null
           ops_can_purge?: boolean
           plan?: Database["public"]["Enums"]["workspace_plan"]
@@ -2410,9 +2521,13 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           trash_retention_days?: number
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Update: {
+          billing_amount?: number | null
+          billing_currency?: string
+          billing_cycle?: string
           billing_status?: string
           brand_logo_url?: string | null
           brand_primary_color?: string | null
@@ -2424,6 +2539,7 @@ export type Database = {
           id?: string
           is_demo?: boolean
           name?: string
+          next_due_date?: string | null
           onboarding_step?: string | null
           ops_can_purge?: boolean
           plan?: Database["public"]["Enums"]["workspace_plan"]
@@ -2435,6 +2551,7 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           trash_retention_days?: number
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -3133,6 +3250,81 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: undefined
+      }
+      platform_agent_usage: {
+        Args: { p_from: string; p_to: string; p_workspace_id?: string }
+        Returns: {
+          calls: number
+          clocked_seconds: number
+          connects: number
+          conversions: number
+          days_active: number
+          email: string
+          first_call_at: string | null
+          first_call_ever: string | null
+          full_name: string
+          is_active: boolean
+          last_call_at: string | null
+          role: string
+          talk_seconds: number
+          user_id: string
+          workspace_id: string
+        }[]
+      }
+      platform_daily_series: {
+        Args: { p_days?: number; p_workspace_id?: string }
+        Returns: {
+          calls: number
+          day: string
+          signups: number
+          talk_minutes: number
+        }[]
+      }
+      platform_users: {
+        Args: { p_workspace_id?: string }
+        Returns: {
+          calls_30d: number
+          created_at: string
+          email: string
+          full_name: string
+          is_active: boolean
+          last_call_at: string | null
+          last_sign_in_at: string | null
+          must_change_password: boolean
+          role: string
+          talk_seconds_30d: number
+          user_id: string
+          workspace_id: string
+        }[]
+      }
+      platform_workspace_metrics: {
+        Args: never
+        Returns: {
+          agents_active: number
+          agents_active_today: number
+          balance: number
+          calls_30d: number
+          calls_7d: number
+          calls_today: number
+          calls_total: number
+          campaigns: number
+          clients: number
+          data_seats_used: number
+          emails_sent_30d: number
+          last_call_at: string | null
+          last_payment_on: string | null
+          last_sign_in_at: string | null
+          leads: number
+          owner_email: string | null
+          owner_name: string | null
+          paid_total: number
+          talk_seconds_30d: number
+          talk_seconds_total: number
+          users_active: number
+          users_total: number
+          workspace_id: string
+          zoom_connected: boolean
+        }[]
       }
       platform_workspace_stats: {
         Args: never

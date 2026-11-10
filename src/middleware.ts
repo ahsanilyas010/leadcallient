@@ -55,9 +55,14 @@ export async function middleware(request: NextRequest) {
   // which search engines would treat as a soft 404.
   if (!signedIn && !isPublic && isPrivate(pathname)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
     url.search = "";
-    url.searchParams.set("next", pathname);
+    // The owner console has its own PIN sign-in.
+    if (pathname === "/platform" || pathname.startsWith("/platform/")) {
+      url.pathname = "/platform/login";
+    } else {
+      url.pathname = "/login";
+      url.searchParams.set("next", pathname);
+    }
     return noindex(NextResponse.redirect(url));
   }
 
@@ -95,6 +100,8 @@ export async function middleware(request: NextRequest) {
 
 const PUBLIC_PATHS = [
   "/login",
+  // Owner console sign-in (emailed PIN); the console itself checks requireOwner().
+  "/platform/login",
   "/signup",
   "/reset-password",
   "/api/leads/inbound",

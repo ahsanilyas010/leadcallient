@@ -91,7 +91,7 @@ export async function seedAssortedWorkspace(admin: Admin): Promise<string | null
   if (wsErr || !ws) throw wsErr ?? new Error("seed: assorted workspace not found after creation");
 
   // The vendor's own workspace never hits the agent seat cap (see migration 115).
-  await admin.from("workspaces").update({ status: "active", seat_limit: UNLIMITED_SEATS }).eq("id", ws.id);
+  await admin.from("workspaces").update({ status: "active", seat_limit: UNLIMITED_SEATS, trial_ends_at: null }).eq("id", ws.id);
 
   return ws.id;
 }
@@ -144,7 +144,7 @@ export async function seedDemoWorkspace(admin: Admin, opts: SeedDemoOptions = {}
   if (!workspace) {
     const { data: created, error } = await admin
       .from("workspaces")
-      .insert({ slug: "demo", name: "Demo", is_demo: true, status: "active", plan: "free", seat_limit: 50 })
+      .insert({ slug: "demo", name: "Demo", is_demo: true, status: "active", plan: "free", seat_limit: 50, trial_ends_at: null })
       .select("*")
       .single();
     if (error || !created) throw error ?? new Error("seed: failed to create demo workspace");

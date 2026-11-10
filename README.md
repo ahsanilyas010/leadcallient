@@ -29,7 +29,7 @@ Product of **Assorted Business LLC** (name, address and contact details live in
 | Integrations / Settings | `/admin/integrations`, `/admin/settings/*` | Zoom, email templates, branding, lead upload |
 | Security & audit | `/admin/security` | Audit log, recent sign-ins, credential events |
 | Agents & billing | `/admin/billing` | Seats in use; Stripe checkout/portal when Stripe is configured, otherwise a contact card (phone / WhatsApp / email from `NEXT_PUBLIC_COMPANY_*`) and bank-transfer details |
-| Platform owner | `/platform` | Vendor-side workspace list and suspension |
+| Owner console | `/platform` | Vendor-side view of every company, user, agent, dialer usage, trial and payment; PIN sign-in (see below) |
 
 Roles: `super_admin`, `ops_manager`, `team_lead`, `agent`, `qa_analyst`,
 `client`. Admins, managers, team leads, QA and clients are free; 3 agents are
@@ -113,6 +113,57 @@ agent-reported. Call recording is whatever your Zoom Phone plan records; we
 only store the link Zoom reports. A campaign's optional caller ID must be an
 E.164 number on your Zoom Phone plan. Existing Twilio tables and columns remain
 in the schema but are unused.
+
+### Owner console (`/platform`)
+
+The product owners' console: every company, its users and agents, dialer
+usage, trials, prices, payments due, and a list of companies that need
+attention. It shows counts and metadata only, never lead phone numbers,
+recordings or call content.
+
+**Sign-in** is at `/platform/login` with a 6-digit PIN emailed by Supabase
+Auth. Only the addresses in `src/lib/owner/allowlist.ts` can get a PIN (edit
+that file and redeploy to change who has access; there is no env var). A PIN
+session lasts 12 hours, and a password sign-in never opens the console.
+
+One-time Supabase setup (Dashboard → Authentication):
+
+1. **Email Templates → Magic Link** and **Confirm signup**: include
+   `{{ .Token }}` in the body so the email shows the code, e.g.
+   `<h2>Your owner console PIN</h2><p>{{ .Token }}</p>`. Magic Link is used
+   for every sign-in; Confirm signup only for an owner's very first one (when
+   Supabase has no user for that email yet). Customer accounts are created
+   with the admin API and never receive either email.
+2. **Providers → Email**: set *Email OTP expiration* to about 600 seconds.
+3. The built-in Supabase mailer sends only a few emails per hour. That is
+   enough for two owners; add custom SMTP under **SMTP Settings** if you hit it.
+
+The first successful PIN sign-in creates the owner's `platform_admins` row.
+`PLATFORM_ADMIN_EMAILS` is no longer needed for console access.
+
+| Page | What it is for |
+|---|---|
+| Overview | Companies by state (active, on trial, trial expired, paying, suspended), users, agents, calls, talk time, MRR, outstanding and overdue, signup and call charts, **Needs attention** |
+| Companies | Search and filter (status, trial, billing, needs attention), sort, CSV export |
+| Company page | Usage, setup progress, signup source; Users (deactivate / reactivate); Dialer usage; Billing (price, cycle, next due date, ledger); Trial & seats; private Notes; Activity; suspend / reactivate / cancel |
+| Users | Everyone across every company: role, last sign-in, calls, talk time; CSV |
+| Dialer usage | Per agent for any date range: calls, connects, sales, talk time, average call, hours clocked, days active; CSV |
+| Billing | Receivables (overdue first), MRR, received in 30 days, recent ledger |
+| Activity | Every owner action (audit trail) and the latest signups |
+
+**Trials**: every new workspace gets a 30-day trial (`workspaces.trial_ends_at`).
+Nothing is locked automatically; the console flags expired trials and you
+suspend by hand. Extend, set or end a trial on the company page.
+
+**Payments** are a manual ledger (`platform_ledger`: charges, payments,
+credits; balance = charges − payments − credits). Set each company's price,
+cycle and next due date, then record payments; recording one can roll the due
+date forward a cycle. The ledger has `provider` / `provider_ref` columns so a
+payment gateway's webhook can post into it later without duplicates.
+
+Migration `00000000000120_owner_console.sql` adds the columns, tables and the
+`platform_*` RPCs. `npm run test:owner` checks against a staging project that
+tenants can't read or change any of it.
 
 ### Resend
 
