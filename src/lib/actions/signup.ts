@@ -37,7 +37,7 @@ function slugify(name: string): string {
   return `${base || "workspace"}-${suffix}`;
 }
 
-// Creates the customer's workspace (free plan, 3 agent seats), makes them
+// Creates the customer's workspace (14-day free trial, 3 agent seats), makes them
 // its super admin and signs them in. The client then fires the ad pixel's
 // CompleteRegistration event and sends them to their dashboard (/start), where
 // the setup checklist and product tour guide them. The workspace is created

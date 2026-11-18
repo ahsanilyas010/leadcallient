@@ -9,10 +9,11 @@ export type TrialState =
   | { kind: "trialing"; daysLeft: number }
   | { kind: "expired"; daysAgo: number };
 
-// A company that has paid at least once counts as paying, whatever its trial
-// date says. Without a trial date (demo, the vendor's own) there is no trial.
-export function trialState(trialEndsAt: string | null, paidTotal: number, now = Date.now()): TrialState {
-  if (paidTotal > 0) return { kind: "paying" };
+// A company that has paid at least once, or that the owner has approved to
+// continue, counts as paying whatever its trial date says. Without a trial
+// date (demo, the vendor's own) there is no trial.
+export function trialState(trialEndsAt: string | null, paidTotal: number, now = Date.now(), approved = false): TrialState {
+  if (paidTotal > 0 || approved) return { kind: "paying" };
   if (!trialEndsAt) return { kind: "none" };
   const end = new Date(trialEndsAt).getTime();
   if (Number.isNaN(end)) return { kind: "none" };

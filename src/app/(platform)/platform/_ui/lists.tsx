@@ -180,6 +180,8 @@ const ACTION_LABEL: Record<string, string> = {
   "owner.sign_in": "Signed in to the owner console",
   "company.status": "Changed company status",
   "company.trial": "Changed trial",
+  "company.approve": "Approved to continue",
+  "company.revoke_approval": "Approval removed",
   "company.seats": "Changed seats",
   "company.billing_plan": "Changed billing plan",
   "company.notes": "Edited notes",

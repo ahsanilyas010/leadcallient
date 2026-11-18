@@ -11,7 +11,7 @@ import { PageHeader, Section, Stat } from "../../../_ui/table";
 import { BillingBadge, FlagBadges, StatusBadge, TrialBadge } from "../../../_ui/badges";
 import { SeriesChart } from "../../../_ui/series-chart";
 import { AuditList, LedgerTable, UsageTable, UsersTable } from "../../../_ui/lists";
-import { BillingPlanForm, LedgerForm, NotesForm, SeatsForm, StatusActions, TrialForm } from "../../../_ui/company-actions";
+import { ApprovalActions, BillingPlanForm, LedgerForm, NotesForm, SeatsForm, StatusActions, TrialForm } from "../../../_ui/company-actions";
 
 export const metadata: Metadata = { title: "Company · Owner console" };
 
@@ -135,6 +135,12 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
       )}
       {tab === "trial" && (
         <div className="grid gap-4 lg:grid-cols-2">
+          <Panel
+            title="Approval"
+            description={ws.access_approved_at ? `Approved ${fmtDateTime(ws.access_approved_at)}` : "Needed to continue once the 14-day trial is over."}
+          >
+            <ApprovalActions workspaceId={ws.id} approvedAt={ws.access_approved_at} locked={c.trial.kind === "expired"} />
+          </Panel>
           <Panel title="Trial" description={ws.trial_ends_at ? `Ends ${fmtDateTime(ws.trial_ends_at)}` : "No trial on this company."}>
             <TrialForm workspaceId={ws.id} trialEndsAt={ws.trial_ends_at} />
           </Panel>

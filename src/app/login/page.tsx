@@ -107,9 +107,9 @@ export default async function LoginPage({
           <p className="mt-1 text-sm text-muted">
             New here?{" "}
             <Link href="/signup" className="font-semibold text-brand-blue hover:underline">
-              Create a free workspace
+              Start a free trial
             </Link>{" "}
-            with {FREE_AGENT_SEATS} agents on us.
+            for {FREE_AGENT_SEATS} agents, free for 14 days.
           </p>
           <div className="mt-4">
             <LoginForm next={next} />

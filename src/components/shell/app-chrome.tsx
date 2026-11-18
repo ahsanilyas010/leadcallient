@@ -8,6 +8,8 @@ import { Suspense } from "react";
 import { NavProgress } from "@/components/shell/nav-progress";
 import { PageTransition } from "@/components/shell/page-transition";
 import { PlanBar, type PlanInfo } from "@/components/shell/plan-bar";
+import { TrialBanner } from "@/components/shell/trial-banner";
+import { BANNER_DAYS } from "@/lib/access";
 import { brandStyle } from "@/lib/branding";
 import { CommandPalette } from "@/components/shell/command-palette";
 import { GuideProvider, type GuideInit } from "@/components/guide/guide-provider";
@@ -75,6 +77,9 @@ export function AppChrome({
 
         <div className="flex min-w-0 flex-1 flex-col overflow-clip">
           <PlanBar info={planInfo} />
+          {planInfo.trial && planInfo.trial.daysLeft <= BANNER_DAYS && (
+            <TrialBanner daysLeft={planInfo.trial.daysLeft} endsAt={planInfo.trial.endsAt} canManageBilling={planInfo.canManageBilling} />
+          )}
           <Header
             profile={profile}
             initialEvent={initialEvent}

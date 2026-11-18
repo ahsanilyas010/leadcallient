@@ -45,7 +45,7 @@ function Submit() {
         </>
       ) : (
         <>
-          Create my free workspace <ArrowRight className="h-5 w-5" />
+          Start my 14-day free trial <ArrowRight className="h-5 w-5" />
         </>
       )}
     </button>
@@ -64,7 +64,7 @@ export function SignupForm() {
   useEffect(() => {
     if (state.ok && !done.current) {
       done.current = true;
-      trackPixel("CompleteRegistration", { content_name: "Free workspace", status: true });
+      trackPixel("CompleteRegistration", { content_name: "Free trial workspace", status: true });
       router.push("/start");
     }
   }, [state.ok, router]);

@@ -12,6 +12,7 @@ import {
   ownerAddLedgerEntry,
   ownerDeleteLedgerEntry,
   ownerSaveNotes,
+  ownerSetApproval,
   ownerSetBillingPlan,
   ownerSetSeats,
   ownerSetStatus,
@@ -65,6 +66,38 @@ export function StatusActions({ workspaceId, status }: { workspaceId: string; st
           Mark canceled
         </Button>
       )}
+    </div>
+  );
+}
+
+export function ApprovalActions({ workspaceId, approvedAt, locked }: { workspaceId: string; approvedAt: string | null; locked: boolean }) {
+  const { pending, run } = useOwnerAction();
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-muted">
+        {approvedAt
+          ? "This company is approved to continue, so its trial date no longer limits access."
+          : locked
+            ? "The trial has ended and this company is locked out. Approve it once you have seen its bank transfer."
+            : "Not approved yet. When the trial ends, access closes until you approve it here."}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {!approvedAt && (
+          <Button size="sm" variant="confirm" disabled={pending} onClick={() => run(() => ownerSetApproval(workspaceId, true), "Company approved. They can sign in again.")}>
+            <Spin on={pending} /> Approve to continue
+          </Button>
+        )}
+        {approvedAt && (
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={pending}
+            onClick={() => window.confirm("Remove the approval? If the trial has ended, this company is locked out again.") && run(() => ownerSetApproval(workspaceId, false), "Approval removed.")}
+          >
+            Remove approval
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

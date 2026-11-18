@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   const p = BRAND.productName;
   return (
-    <LegalPage title="Terms of Service" updated="September 2026">
+    <LegalPage title="Terms of Service" updated="November 2026">
       <p>
         These terms govern your use of {p}, provided by {COMPANY.legalName} (&ldquo;we&rdquo;, &ldquo;us&rdquo;). By creating an account you agree to
         them on behalf of yourself and the organisation you represent.
@@ -29,11 +29,19 @@ export default function TermsPage() {
       <h2>Plans and payment</h2>
       <ul>
         <li>
-          Every workspace includes {FREE_AGENT_SEATS} agent seats free. Additional agent seats are billed monthly in advance at the price shown
-          when you upgrade, through our payment provider, Stripe.
+          Every new workspace includes a free 14-day trial for {FREE_AGENT_SEATS} agent seats. When the trial ends, access to the workspace is paused
+          until payment is received and we approve the company; your data is kept and nothing is deleted. Additional agent seats are billed in advance at the
+          price we agree with you, by bank transfer or through our payment provider, Stripe.
         </li>
         <li>You can change or cancel seats at any time; changes are prorated on the next invoice. Fees already paid are non-refundable except where the law requires.</li>
         <li>Calling runs through your own Zoom Phone account; Zoom bills call minutes and phone numbers to you, not us.</li>
+      </ul>
+
+      <h2>Free trial and access</h2>
+      <ul>
+        <li>There is no lifetime free plan. The free trial lasts 14 days from when the workspace is created.</li>
+        <li>We remind the workspace admin before the trial ends. Customers who were on our earlier free plan are given at least 2 days&apos; notice before their access is paused.</li>
+        <li>When the trial ends, access is paused until we have received payment and approved the company. Please send a screenshot or receipt of your payment so we can approve it. Your data is kept and nothing is deleted.</li>
       </ul>
 
       <h2>Acceptable use and compliance</h2>

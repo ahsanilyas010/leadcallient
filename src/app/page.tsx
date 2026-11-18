@@ -31,11 +31,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { BrandMark } from "@/components/brand/mark";
-import { BRAND } from "@/lib/brand";
+import { BRAND, BILLING } from "@/lib/brand";
 import { absoluteUrl, siteUrl } from "@/lib/site";
 import { Reveal } from "@/components/landing/reveal";
 import { SiteHeader, SiteFooter, demoCta } from "@/components/landing/site-chrome";
 import { FREE_AGENT_SEATS } from "@/lib/plan";
+import { TRIAL_DAYS } from "@/lib/access";
 import { jsonLdHtml, organizationJsonLd } from "@/lib/structured-data";
 
 export const metadata: Metadata = {
@@ -86,7 +87,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "How much does it cost to start?",
-    a: `Every workspace starts free with ${FREE_AGENT_SEATS} agents, and admins, managers, team leads and QA are always free. When you need more agents, your admin adds them under Agents & billing. Call minutes are billed by Zoom to your own Zoom Phone account, not by LeadCallient.`,
+    a: `Every workspace starts with a free 14-day trial for ${FREE_AGENT_SEATS} agents, no card needed. Admins, managers, team leads and QA don't use a seat. To keep going after the trial, pay by bank transfer and we approve your company. Call minutes are billed by Zoom to your own Zoom Phone account, not by LeadCallient.`,
   },
   {
     q: "Is the demo using real data?",
@@ -279,7 +280,7 @@ export default async function LandingPage() {
               </Link>
             </div>
             <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm text-white/65">
-              {[`${FREE_AGENT_SEATS} agents free forever`, "No card needed", "Set up in 2 minutes"].map((t) => (
+              {[`14-day free trial, ${FREE_AGENT_SEATS} agents`, "No card needed", "Set up in 2 minutes"].map((t) => (
                 <span key={t} className="inline-flex items-center gap-1.5">
                   <Check className="h-4 w-4 text-emerald-300" /> {t}
                 </span>
@@ -294,7 +295,7 @@ export default async function LandingPage() {
       <section className="px-4 py-14">
         <div className="mx-auto grid max-w-5xl grid-cols-2 gap-4 sm:grid-cols-4">
           {[
-            { n: String(FREE_AGENT_SEATS), l: "agents free forever" },
+            { n: "14", l: `day free trial, ${FREE_AGENT_SEATS} agents` },
             { n: "6", l: "roles with their own view" },
             { n: "30", l: "call outcomes out of the box" },
             { n: "1", l: "screen per call" },
@@ -497,6 +498,35 @@ export default async function LandingPage() {
         </div>
       </section>
 
+      {/* Trial and access policy */}
+      <section id="pricing" className="scroll-mt-20 px-4 py-20">
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center">
+            <h2 className="font-display text-3xl font-semibold text-ink sm:text-4xl">Try it for {TRIAL_DAYS} days, then pay to continue</h2>
+            <p className="mx-auto mt-3 max-w-2xl text-muted">
+              No lifetime free plan. Every new workspace gets a {TRIAL_DAYS}-day free trial for {FREE_AGENT_SEATS} agents with every feature included and no card needed.
+            </p>
+          </div>
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {[
+              { n: "1", t: `${TRIAL_DAYS}-day free trial`, d: `${FREE_AGENT_SEATS} agents, every feature, unlimited admins, managers, team leads and QA. No card needed.` },
+              { n: "2", t: "Access pauses when it ends", d: "You get a reminder before the last day. After that your team can't sign in until your company is approved. Nothing is deleted." },
+              { n: "3", t: "Pay, send the receipt, carry on", d: `Pay by bank transfer at the price agreed with our team, send us a screenshot of the payment on WhatsApp (${BILLING.phone}), and we approve your company.` },
+            ].map((x) => (
+              <div key={x.n} className="rounded-2xl border border-line bg-surface p-6">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-blue text-sm font-semibold text-white">{x.n}</span>
+                <h3 className="mt-4 font-display text-lg font-semibold text-ink">{x.t}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted">{x.d}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-6 text-center text-sm text-muted">
+            Questions about pricing? Call or WhatsApp{" "}
+            <a href={BILLING.whatsappUrl} className="font-semibold text-brand-blue hover:underline">{BILLING.phone}</a>.
+          </p>
+        </div>
+      </section>
+
       {/* FAQ */}
       <section id="faq" className="scroll-mt-20 bg-surface px-4 py-20">
         <Reveal>
@@ -520,9 +550,9 @@ export default async function LandingPage() {
         <Reveal>
           <div className="brand-banner mx-auto max-w-5xl px-6 py-14 text-center sm:px-12">
             <div className="relative z-10">
-              <h2 className="font-display text-3xl font-semibold sm:text-4xl">Start with {FREE_AGENT_SEATS} agents, free</h2>
+              <h2 className="font-display text-3xl font-semibold sm:text-4xl">Try {FREE_AGENT_SEATS} agents free for {TRIAL_DAYS} days</h2>
               <p className="mx-auto mt-3 max-w-xl text-white/80">
-                Create your workspace in two minutes. Every feature included, no card needed. Add seats only when your floor grows.
+                Create your workspace in two minutes. Every feature included, no card needed. Keep going after the trial by paying at the price agreed with our team.
               </p>
               <div className="mt-8 flex flex-wrap justify-center gap-3">
                 <Link

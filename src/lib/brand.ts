@@ -45,6 +45,21 @@ export const COMPANY = {
   whatsappUrl: process.env.NEXT_PUBLIC_COMPANY_WHATSAPP_URL ?? "https://wa.me/923218526405",
 };
 
+// Where customers pay and who to contact about their trial, billing and
+// approval. Shown on the trial banner, the "trial ended" page and Agents &
+// billing. Payment is by bank transfer; once we have seen the payment the
+// owner approves the company in the owner console and access resumes.
+export const BILLING = {
+  phone: "+92 342 2221633",
+  whatsappUrl: "https://wa.me/923422221633",
+  bank: {
+    accountTitle: "Assorted Business Services",
+    bankName: "Faysal Bank",
+    accountNumber: "0213 007000001472",
+    iban: "PK56FAYS0213007000001472",
+  },
+};
+
 // "470 Schooleys Mountain Rd, Hackettstown, NJ 07840, US"
 export function companyAddressLine(): string {
   const a = COMPANY.address;
