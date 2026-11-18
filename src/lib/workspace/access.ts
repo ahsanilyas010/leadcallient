@@ -11,6 +11,9 @@ type WorkspaceRow = Pick<
 export const ACCESS_COLUMNS = "is_demo, seat_limit, stripe_subscription_id, trial_ends_at, access_approved_at";
 
 export function accessFromRow(w: WorkspaceRow, now = Date.now()): AccessState {
+  // Migration 121 (the access_approved_at column) isn't applied yet: the trial
+  // rules can't be evaluated safely, so nobody is locked out until it is.
+  if (w.access_approved_at === undefined) return { kind: "full", reason: "no_trial" };
   return accessState(
     {
       isDemo: w.is_demo,
