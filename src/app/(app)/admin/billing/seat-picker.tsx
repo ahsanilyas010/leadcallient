@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowRight, CreditCard, Loader2, Lock, Minus, Plus } from "lucide-react";
-import { FREE_AGENT_SEATS } from "@/lib/plan";
+import { TRIAL_DAYS } from "@/lib/access";
 import { openBillingPortal, simulateUpgrade, startCheckout } from "@/lib/actions/billing";
 
 // Choose agent seats, see the monthly price, continue to card payment.
@@ -44,7 +44,7 @@ export function SeatPicker({
     <div className="rounded-3xl bg-white p-6 ring-1 ring-line sm:p-8">
       <h2 className="font-display text-xl font-semibold text-ink">Add agent seats</h2>
       <p className="mt-1 text-sm text-muted">
-        Your first {FREE_AGENT_SEATS} agents stay free. Admins, managers, team leads, QA and client logins never cost anything.
+        Agent seats are billed once your {TRIAL_DAYS}-day free trial ends. Admins, managers, team leads, QA and client logins never cost anything.
       </p>
 
       <div className="mt-6 flex items-center gap-4">
@@ -84,7 +84,7 @@ export function SeatPicker({
             <span className="text-sm font-normal text-muted"> agent seats</span>
           </div>
           <div className="text-xs text-muted">
-            {seats} agents · {FREE_AGENT_SEATS} free + {seats - FREE_AGENT_SEATS} paid
+            {seats} paid agent seats
           </div>
         </div>
       </div>
