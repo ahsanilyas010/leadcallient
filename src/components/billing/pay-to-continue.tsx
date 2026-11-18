@@ -2,7 +2,7 @@ import { MessageCircle, Phone } from "lucide-react";
 import { BILLING } from "@/lib/brand";
 import { bankTransferDetails } from "@/lib/billing/bank-transfer";
 
-// How to keep (or get back) access once the 30-day trial is over: pay by bank
+// How to keep (or get back) access once the 14-day trial is over: pay by bank
 // transfer, tell us, and we approve the company. Server component: the bank
 // details come from bankTransferDetails() (defaults in src/lib/brand.ts).
 export function PayToContinue({ workspaceName, canPay = true }: { workspaceName: string; canPay?: boolean }) {

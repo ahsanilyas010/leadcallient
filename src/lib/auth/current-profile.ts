@@ -32,7 +32,7 @@ export const requireProfile = cache(async (): Promise<Profile> => {
   if (!profile.is_active) redirect("/login?signed_out=1");
   if (profile.must_change_password) redirect("/change-password");
 
-  // The 30-day trial has ended and the owner hasn't approved the company yet:
+  // The 14-day trial has ended and the owner hasn't approved the company yet:
   // every signed-in page and action stops here until it is approved.
   if (isLocked(await workspaceAccess(supabase, profile.workspace_id))) redirect("/trial-ended");
 

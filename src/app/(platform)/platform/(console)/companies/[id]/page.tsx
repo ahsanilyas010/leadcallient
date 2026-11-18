@@ -137,7 +137,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
         <div className="grid gap-4 lg:grid-cols-2">
           <Panel
             title="Approval"
-            description={ws.access_approved_at ? `Approved ${fmtDateTime(ws.access_approved_at)}` : "Needed to continue once the 30-day trial is over."}
+            description={ws.access_approved_at ? `Approved ${fmtDateTime(ws.access_approved_at)}` : "Needed to continue once the 14-day trial is over."}
           >
             <ApprovalActions workspaceId={ws.id} approvedAt={ws.access_approved_at} locked={c.trial.kind === "expired"} />
           </Panel>

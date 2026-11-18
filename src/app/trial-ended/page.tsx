@@ -12,7 +12,7 @@ import { fmtDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Free trial ended", robots: { index: false, follow: false } };
 
-// Where everyone in a workspace lands once its 30-day trial is over and the
+// Where everyone in a workspace lands once its 14-day trial is over and the
 // owner hasn't approved it yet (see requireProfile()). Approving the company
 // in the owner console is what lets them back in: this page then sends them
 // straight on to the app.
@@ -42,7 +42,7 @@ export default async function TrialEndedPage() {
             </div>
           </div>
           <p className="mt-4 text-sm text-muted">
-            The free trial lasts 30 days and covers 3 agents. Access to {workspace.name} is paused until the company is approved to continue. Your leads, campaigns and
+            The free trial lasts 14 days and covers 3 agents. Access to {workspace.name} is paused until the company is approved to continue. Your leads, campaigns and
             call history are safe.
           </p>
           <div className="mt-6">

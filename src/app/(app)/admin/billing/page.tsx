@@ -75,7 +75,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                 ? paid
                   ? `${workspace.agentSeats} agent seats, billed monthly`
                   : trial
-                  ? `${FREE_AGENT_SEATS} agents included for 30 days. Trial ends ${fmtDate(trial.endsAt)}.`
+                  ? `${FREE_AGENT_SEATS} agents included for 14 days. Trial ends ${fmtDate(trial.endsAt)}.`
                   : `${FREE_AGENT_SEATS} agents included`
                 : `${workspace.agentSeats} agent seat${workspace.agentSeats === 1 ? "" : "s"} on this workspace`}
           </p>

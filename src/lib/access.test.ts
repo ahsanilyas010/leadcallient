@@ -7,7 +7,7 @@ const NOW = Date.parse("2026-11-18T12:00:00Z");
 const base: AccessInput = { isDemo: false, seatLimit: 3, hasSubscription: false, trialEndsAt: "2026-12-10T12:00:00Z", accessApprovedAt: null };
 
 describe("accessState", () => {
-  it("is a trial with days left while the 30 days run", () => {
+  it("is a trial with days left while the 14 days run", () => {
     expect(accessState(base, NOW)).toEqual({ kind: "trial", daysLeft: 22, endsAt: base.trialEndsAt });
   });
 

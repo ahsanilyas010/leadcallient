@@ -97,7 +97,7 @@ export async function ownerSetTrial(workspaceId: string, input: z.input<typeof t
 }
 
 // ---------------------------------------------------------------- approval
-// Approving a company lets it carry on after its 30-day trial (the customer
+// Approving a company lets it carry on after its 14-day trial (the customer
 // has paid by bank transfer and sent us the receipt). Revoking puts it back on
 // the trial clock: if that has already run out, access closes again at once.
 export async function ownerSetApproval(workspaceId: string, approved: boolean): Promise<OwnerResult> {

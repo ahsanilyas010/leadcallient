@@ -152,7 +152,7 @@ export default function ContactPage() {
             {/* Next steps */}
             <div className="flex flex-col gap-4">
               {[
-                { href: "/signup", icon: PlayCircle, title: "Start free", text: `30-day free trial for ${FREE_AGENT_SEATS} agents, set up in two minutes.` },
+                { href: "/signup", icon: PlayCircle, title: "Start free", text: `14-day free trial for ${FREE_AGENT_SEATS} agents, set up in two minutes.` },
                 { href: "/login#demo", icon: Sparkles, title: "Try the live demo", text: "Six roles on a real demo workspace, no sign-up." },
               ].map(({ href, icon: Icon, title, text }) => (
                 <Link

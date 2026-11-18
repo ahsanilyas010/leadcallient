@@ -1,4 +1,4 @@
-// Who may use a workspace. The free plan is now a 30-day trial for 3 agents;
+// Who may use a workspace. The free plan is now a 14-day trial for 3 agents;
 // when it runs out, access closes until the owner approves the company (after
 // the customer has paid). Pure functions, no I/O: shared by the signed-in
 // gate, the banner, the cron that sends the 2-day notice and the owner console.
@@ -9,7 +9,7 @@ const DAY = 86_400_000;
 
 // How long a new workspace's trial runs. The database default
 // (workspaces.trial_ends_at) must match.
-export const TRIAL_DAYS = 30;
+export const TRIAL_DAYS = 14;
 
 // Customers are told this many days before their access closes.
 export const NOTICE_DAYS = 2;

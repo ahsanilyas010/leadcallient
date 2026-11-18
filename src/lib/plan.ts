@@ -1,7 +1,7 @@
 // Plan limits. Prices aren't published on the site; paid seats are priced
 // in Stripe (see src/lib/billing/stripe.ts) and shown at checkout.
 
-// Agents included in the free trial (30 days, see src/lib/access.ts). After
+// Agents included in the free trial (14 days, see src/lib/access.ts). After
 // the trial a workspace needs the owner's approval, which follows payment.
 // Admins, ops managers, team leads, QA analysts and client logins never use
 // a seat.

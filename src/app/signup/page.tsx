@@ -9,13 +9,13 @@ import { FREE_AGENT_SEATS } from "@/lib/plan";
 import { SignupForm } from "./signup-form";
 
 export const metadata: Metadata = {
-  title: "Start a 30-day free trial: 3 agents",
-  description: `Create your ${BRAND.productName} workspace in two minutes. A 30-day free trial for ${FREE_AGENT_SEATS} agents, every feature included, no card needed. Call through your own Zoom Phone account.`,
+  title: "Start a 14-day free trial: 3 agents",
+  description: `Create your ${BRAND.productName} workspace in two minutes. A 14-day free trial for ${FREE_AGENT_SEATS} agents, every feature included, no card needed. Call through your own Zoom Phone account.`,
   alternates: { canonical: "/signup" },
   openGraph: {
     type: "website",
     siteName: BRAND.productName,
-    title: `Start ${BRAND.productName}: 30-day free trial for ${FREE_AGENT_SEATS} agents`,
+    title: `Start ${BRAND.productName}: 14-day free trial for ${FREE_AGENT_SEATS} agents`,
     description: "Every feature, no card needed. Set up your call centre in two minutes.",
     url: "/signup",
     images: ["/opengraph-image"],
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 const POINTS = [
-  { icon: Headset, text: `30-day free trial for ${FREE_AGENT_SEATS} agents, plus unlimited admins, managers and QA` },
+  { icon: Headset, text: `14-day free trial for ${FREE_AGENT_SEATS} agents, plus unlimited admins, managers and QA` },
   { icon: PhoneCall, text: "Call through your own Zoom Phone account" },
   { icon: CalendarCheck, text: "Clock-in, shifts and leave built in" },
   { icon: ShieldCheck, text: "Compliance, QA and live floor built in" },
@@ -70,7 +70,7 @@ export default function SignupPage() {
           </Link>
           <h1 className="font-display text-3xl font-semibold text-ink sm:text-4xl">Start your free trial</h1>
           <p className="mt-2 text-muted">
-            30 days free for {FREE_AGENT_SEATS} agents. Every feature, no card needed.
+            14 days free for {FREE_AGENT_SEATS} agents. Every feature, no card needed.
           </p>
           <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted">
             {["Set up in 2 minutes", "Keep going by bank transfer", "Cancel any time"].map((t) => (

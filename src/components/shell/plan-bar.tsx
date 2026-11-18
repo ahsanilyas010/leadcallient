@@ -20,7 +20,7 @@ export interface PlanInfo {
   // False when no payment provider is configured: there is no self-serve plan to
   // show, so the bar offers "Contact us" (phone / WhatsApp) instead of Upgrade.
   billingReady?: boolean;
-  // Free trial in progress (30 days, 3 agents): drives the plan label, the
+  // Free trial in progress (14 days, 3 agents): drives the plan label, the
   // "Keep access" link and the ending-soon banner. null once paid/approved.
   trial?: { daysLeft: number; endsAt: string } | null;
   // Overrides the "Free plan" / "Paid plan" label, e.g. "Approved".

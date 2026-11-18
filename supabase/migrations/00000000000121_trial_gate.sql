@@ -1,4 +1,4 @@
--- Free-for-life is over: a workspace gets a 30-day trial (3 agent seats) and
+-- Free-for-life is over: a workspace gets a 14-day trial (3 agent seats) and
 -- then access is closed until the owner approves it (after the customer has
 -- paid by bank transfer). See src/lib/access.ts for the rule the app applies.
 --
@@ -13,6 +13,9 @@
 alter table workspaces
   add column if not exists access_approved_at timestamptz,
   add column if not exists trial_notice_sent_at timestamptz;
+
+-- New workspaces: 14 days (migration 120 set the default to 30).
+alter table workspaces alter column trial_ends_at set default (now() + interval '14 days');
 
 -- Same guard as migration 120, now also covering the two new owner-only
 -- columns (a customer's own session must not be able to approve itself).
@@ -69,12 +72,12 @@ update workspaces w
      or exists (select 1 from platform_ledger l where l.workspace_id = w.id and l.kind = 'payment')
    );
 
--- Everyone else on the old free plan: keep whatever trial time they still
--- have, but never less than 2 days from now. That is the notice period; their
+-- Everyone else on the old free plan: a 14-day trial from the day they signed
+-- up, but never less than 2 days from now. That is the notice period; their
 -- access closes when trial_ends_at passes. Demo and Assorted's own
 -- (unlimited-seat) workspaces have no trial and are left alone.
 update workspaces w
-   set trial_ends_at = greatest(coalesce(w.trial_ends_at, now()), now() + interval '2 days'),
+   set trial_ends_at = greatest(w.created_at + interval '14 days', now() + interval '2 days'),
        trial_notice_sent_at = null
  where w.access_approved_at is null
    and not w.is_demo

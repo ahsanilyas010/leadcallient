@@ -45,7 +45,7 @@ function Submit() {
         </>
       ) : (
         <>
-          Start my 30-day free trial <ArrowRight className="h-5 w-5" />
+          Start my 14-day free trial <ArrowRight className="h-5 w-5" />
         </>
       )}
     </button>

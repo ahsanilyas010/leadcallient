@@ -29,7 +29,7 @@ export default function TermsPage() {
       <h2>Plans and payment</h2>
       <ul>
         <li>
-          Every new workspace includes a free 30-day trial for {FREE_AGENT_SEATS} agent seats. When the trial ends, access to the workspace is paused
+          Every new workspace includes a free 14-day trial for {FREE_AGENT_SEATS} agent seats. When the trial ends, access to the workspace is paused
           until payment is received and we approve the company; your data is kept and nothing is deleted. Additional agent seats are billed in advance at the
           price we agree with you, by bank transfer or through our payment provider, Stripe.
         </li>

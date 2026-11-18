@@ -109,7 +109,7 @@ export default async function LoginPage({
             <Link href="/signup" className="font-semibold text-brand-blue hover:underline">
               Start a free trial
             </Link>{" "}
-            for {FREE_AGENT_SEATS} agents, free for 30 days.
+            for {FREE_AGENT_SEATS} agents, free for 14 days.
           </p>
           <div className="mt-4">
             <LoginForm next={next} />
