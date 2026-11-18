@@ -29,8 +29,9 @@ export default function TermsPage() {
       <h2>Plans and payment</h2>
       <ul>
         <li>
-          Every workspace includes {FREE_AGENT_SEATS} agent seats free. Additional agent seats are billed monthly in advance at the price shown
-          when you upgrade, through our payment provider, Stripe.
+          Every new workspace includes a free 30-day trial for {FREE_AGENT_SEATS} agent seats. When the trial ends, access to the workspace is paused
+          until payment is received and we approve the company; your data is kept and nothing is deleted. Additional agent seats are billed in advance at the
+          price we agree with you, by bank transfer or through our payment provider, Stripe.
         </li>
         <li>You can change or cancel seats at any time; changes are prorated on the next invoice. Fees already paid are non-refundable except where the law requires.</li>
         <li>Calling runs through your own Zoom Phone account; Zoom bills call minutes and phone numbers to you, not us.</li>

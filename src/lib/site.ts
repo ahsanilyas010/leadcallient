@@ -34,5 +34,6 @@ export const PRIVATE_PATH_PREFIXES = [
   "/start",
   "/platform",
   "/change-password",
+  "/trial-ended",
   "/api",
 ];

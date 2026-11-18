@@ -86,7 +86,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "How much does it cost to start?",
-    a: `Every workspace starts free with ${FREE_AGENT_SEATS} agents, and admins, managers, team leads and QA are always free. When you need more agents, your admin adds them under Agents & billing. Call minutes are billed by Zoom to your own Zoom Phone account, not by LeadCallient.`,
+    a: `Every workspace starts with a free 30-day trial for ${FREE_AGENT_SEATS} agents, no card needed. Admins, managers, team leads and QA don't use a seat. To keep going after the trial, pay by bank transfer and we approve your company. Call minutes are billed by Zoom to your own Zoom Phone account, not by LeadCallient.`,
   },
   {
     q: "Is the demo using real data?",
@@ -279,7 +279,7 @@ export default async function LandingPage() {
               </Link>
             </div>
             <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm text-white/65">
-              {[`${FREE_AGENT_SEATS} agents free forever`, "No card needed", "Set up in 2 minutes"].map((t) => (
+              {[`30-day free trial, ${FREE_AGENT_SEATS} agents`, "No card needed", "Set up in 2 minutes"].map((t) => (
                 <span key={t} className="inline-flex items-center gap-1.5">
                   <Check className="h-4 w-4 text-emerald-300" /> {t}
                 </span>
@@ -294,7 +294,7 @@ export default async function LandingPage() {
       <section className="px-4 py-14">
         <div className="mx-auto grid max-w-5xl grid-cols-2 gap-4 sm:grid-cols-4">
           {[
-            { n: String(FREE_AGENT_SEATS), l: "agents free forever" },
+            { n: "30", l: `day free trial, ${FREE_AGENT_SEATS} agents` },
             { n: "6", l: "roles with their own view" },
             { n: "30", l: "call outcomes out of the box" },
             { n: "1", l: "screen per call" },

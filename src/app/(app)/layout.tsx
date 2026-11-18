@@ -12,6 +12,7 @@ import { isManagerRole } from "@/lib/guide/tours";
 import { worksShifts } from "@/lib/roles";
 import type { GuideInit } from "@/components/guide/guide-provider";
 import { stripeConfigured } from "@/lib/billing/stripe";
+import { accessFromRow } from "@/lib/workspace/access";
 
 // The signed-in app is not for search engines.
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -39,6 +40,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     manager ? fetchSetupProgress() : Promise.resolve(null),
   ]);
 
+  const access = accessFromRow(workspace);
+
   const planInfo = {
     workspaceName: workspace.name,
     plan: workspace.plan,
@@ -48,6 +51,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     isRealDemo: workspace.is_demo,
     // Without a payment provider an upgrade would dead-end, so the bar offers "Contact sales" instead.
     billingReady: stripeConfigured(),
+    trial: access.kind === "trial" ? { daysLeft: access.daysLeft, endsAt: access.endsAt } : null,
+    planLabel: access.kind === "full" && access.reason === "approved" ? "Approved" : undefined,
   };
 
   const branding = { logoUrl: workspace.brand_logo_url ?? null, productName: workspace.brand_product_name ?? null };

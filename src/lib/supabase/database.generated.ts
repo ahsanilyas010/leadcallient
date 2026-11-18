@@ -2465,6 +2465,7 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          access_approved_at: string | null
           billing_amount: number | null
           billing_currency: string
           billing_cycle: string
@@ -2492,9 +2493,11 @@ export type Database = {
           stripe_subscription_id: string | null
           trash_retention_days: number
           trial_ends_at: string | null
+          trial_notice_sent_at: string | null
           updated_at: string
         }
         Insert: {
+          access_approved_at?: string | null
           billing_amount?: number | null
           billing_currency?: string
           billing_cycle?: string
@@ -2522,9 +2525,11 @@ export type Database = {
           stripe_subscription_id?: string | null
           trash_retention_days?: number
           trial_ends_at?: string | null
+          trial_notice_sent_at?: string | null
           updated_at?: string
         }
         Update: {
+          access_approved_at?: string | null
           billing_amount?: number | null
           billing_currency?: string
           billing_cycle?: string
@@ -2552,6 +2557,7 @@ export type Database = {
           stripe_subscription_id?: string | null
           trash_retention_days?: number
           trial_ends_at?: string | null
+          trial_notice_sent_at?: string | null
           updated_at?: string
         }
         Relationships: []

@@ -12,6 +12,9 @@ import { bankTransferDetails } from "@/lib/billing/bank-transfer";
 import { FREE_AGENT_SEATS, SELF_SERVE_MAX_AGENTS, fmtSeats, isUnlimitedSeats } from "@/lib/plan";
 import { ManageBillingButton, SeatPicker } from "./seat-picker";
 import { ContactCard } from "./contact-card";
+import { accessFromRow } from "@/lib/workspace/access";
+import { PayToContinue } from "@/components/billing/pay-to-continue";
+import { fmtDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Agents & billing" };
 
@@ -28,6 +31,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const unlimited = isUnlimitedSeats(workspace.agentSeats);
   const pct = unlimited ? 0 : Math.min(100, Math.round((used / workspace.agentSeats) * 100));
   const paid = workspace.plan === "paid";
+  const access = accessFromRow(row);
+  const trial = access.kind === "trial" ? access : null;
+  const approved = access.kind === "full" && access.reason === "approved";
   // "simulate" (a Stripe-less preview upgrade) no longer applies — real
   // accounts always live in Supabase now, so an unconfigured deployment is
   // just "offline" rather than a special in-memory-only mode.
@@ -48,19 +54,36 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         <div className="rounded-2xl bg-canvas px-4 py-3 text-sm text-muted ring-1 ring-line">Checkout cancelled. Nothing was charged.</div>
       )}
 
+      {trial && (
+        <div className="rounded-3xl bg-white p-6 ring-1 ring-line sm:p-8" data-testid="trial-pay">
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-blue">Keep your access</div>
+          <h2 className="mt-2 font-display text-xl font-semibold text-ink">Pay before {fmtDate(trial.endsAt)} to continue without a break</h2>
+          <div className="mt-4">
+            <PayToContinue workspaceName={workspace.name} />
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[1fr_1.4fr]">
         <div className="rounded-3xl bg-white p-6 ring-1 ring-line sm:p-8">
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-blue">{selfServe ? "Current plan" : "Your workspace"}</div>
-          <h1 className="mt-2 font-display text-3xl font-semibold text-ink">{selfServe ? (paid ? "Paid" : "Free") : workspace.name}</h1>
+          <h1 className="mt-2 font-display text-3xl font-semibold text-ink">{trial ? "Free trial" : approved ? "Approved" : selfServe ? (paid ? "Paid" : "Free") : workspace.name}</h1>
           <p className="mt-1 text-sm text-muted">
             {unlimited
               ? "Unlimited agent seats on this workspace"
               : selfServe
                 ? paid
                   ? `${workspace.agentSeats} agent seats, billed monthly`
-                  : `${FREE_AGENT_SEATS} agents included, free forever`
+                  : trial
+                  ? `${FREE_AGENT_SEATS} agents included for 30 days. Trial ends ${fmtDate(trial.endsAt)}.`
+                  : `${FREE_AGENT_SEATS} agents included`
                 : `${workspace.agentSeats} agent seat${workspace.agentSeats === 1 ? "" : "s"} on this workspace`}
           </p>
+          {trial && !unlimited && (
+            <p className="mt-3 rounded-xl bg-gold/10 px-3 py-2 text-xs text-ink ring-1 ring-gold/30">
+              {trial.daysLeft} day{trial.daysLeft === 1 ? "" : "s"} left in your free trial. After {fmtDate(trial.endsAt)}, access is paused until we approve your company.
+            </p>
+          )}
           {workspace.billingStatus === "past_due" && (
             <p className="mt-3 rounded-xl bg-danger-tint px-3 py-2 text-xs text-danger">Your last payment failed. Update your card to keep your seats.</p>
           )}
@@ -148,12 +171,12 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         </p>
       </div>
 
-      {bank && (
+      {bank && !trial && (
         <div className="rounded-3xl bg-white p-6 ring-1 ring-line sm:p-8">
           <h2 className="font-display text-xl font-semibold text-ink">Pay by bank transfer</h2>
           <p className="mt-1 text-sm text-muted">
             Prefer not to pay by card? Transfer to the account below, use <span className="font-medium text-ink">{workspace.name}</span> as the reference,
-            and we&apos;ll activate your seats once the payment arrives.
+            and we&apos;ll activate your seats once the payment arrives and your company is approved.
           </p>
           <dl className="mt-4 grid max-w-xl grid-cols-[9rem_1fr] gap-x-4 gap-y-2 text-sm">
             {bank.rows.map((r) => (

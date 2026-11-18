@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createRealClient } from "@/lib/supabase/real";
 import type { RealTables } from "@/lib/supabase/real-types";
 import { isOwnerEmail, OWNER_SESSION_HOURS } from "@/lib/owner/allowlist";
+import { isLocked } from "@/lib/access";
+import { workspaceAccess } from "@/lib/workspace/access";
 
 export type Profile = RealTables<"profiles">;
 export type RealProfile = Profile;
@@ -30,11 +32,16 @@ export const requireProfile = cache(async (): Promise<Profile> => {
   if (!profile.is_active) redirect("/login?signed_out=1");
   if (profile.must_change_password) redirect("/change-password");
 
+  // The 30-day trial has ended and the owner hasn't approved the company yet:
+  // every signed-in page and action stops here until it is approved.
+  if (isLocked(await workspaceAccess(supabase, profile.workspace_id))) redirect("/trial-ended");
+
   return profile;
 });
 
 // Same as requireProfile() but without the forced-password-change redirect
-// (the change-password page itself uses it).
+// or the trial lock (the change-password and trial-ended pages use it, and so
+// do a few actions that check the lock themselves).
 export const requireRealProfile = cache(async (): Promise<Profile> => {
   const supabase = await createRealClient();
   const {

@@ -69,7 +69,7 @@ function latest(...dates: (string | null)[]): string | null {
 export function toCompany(ws: Workspace, metrics: Metrics | undefined, now = Date.now()): Company {
   const m = metrics ?? { workspace_id: ws.id, ...EMPTY_METRICS };
   const balance = Number(m.balance) || 0;
-  const trial = trialState(ws.trial_ends_at, Number(m.paid_total) || 0, now);
+  const trial = trialState(ws.trial_ends_at, Number(m.paid_total) || 0, now, Boolean(ws.access_approved_at || ws.stripe_subscription_id));
   const billing = billingState(balance, ws.next_due_date, ws.billing_amount === null ? null : Number(ws.billing_amount), now);
   return {
     ws,

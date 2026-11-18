@@ -96,6 +96,23 @@ export async function ownerSetTrial(workspaceId: string, input: z.input<typeof t
   return {};
 }
 
+// ---------------------------------------------------------------- approval
+// Approving a company lets it carry on after its 30-day trial (the customer
+// has paid by bank transfer and sent us the receipt). Revoking puts it back on
+// the trial clock: if that has already run out, access closes again at once.
+export async function ownerSetApproval(workspaceId: string, approved: boolean): Promise<OwnerResult> {
+  const owner = await requireOwner();
+  if (!uuid.safeParse(workspaceId).success) return { error: "Unknown company." };
+  const ws = await loadWorkspace(workspaceId);
+  if (!ws) return { error: "Unknown company." };
+  const next = approved ? new Date().toISOString() : null;
+  const { error } = await createServiceClient().from("workspaces").update({ access_approved_at: next }).eq("id", workspaceId);
+  if (error) return { error: error.message };
+  await audit(owner, approved ? "company.approve" : "company.revoke_approval", workspaceId, { from: ws.access_approved_at, to: next });
+  refresh(workspaceId);
+  return {};
+}
+
 // ---------------------------------------------------------------- seats
 const seatsSchema = z.object({
   agentSeats: z.coerce.number().int().min(0).max(100000),
@@ -190,7 +207,9 @@ export async function ownerAddLedgerEntry(workspaceId: string, input: z.input<ty
   // Recording a payment rolls the next due date forward one cycle, and a
   // first payment marks the plan as paid.
   if (v.kind === "payment") {
-    const update: { next_due_date?: string; plan?: "paid" } = { plan: "paid" };
+    // Seeing the money is the approval: the company is let in (or stays in).
+    const update: { next_due_date?: string; plan?: "paid"; access_approved_at?: string } = { plan: "paid" };
+    if (!ws.access_approved_at) update.access_approved_at = new Date().toISOString();
     if (v.advanceDue && ws.next_due_date) update.next_due_date = advanceDueDate(ws.next_due_date, ws.billing_cycle);
     await admin.from("workspaces").update(update).eq("id", workspaceId);
   }

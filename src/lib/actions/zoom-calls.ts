@@ -3,6 +3,8 @@
 import { z } from "zod";
 import { requireRealProfile } from "@/lib/auth/current-profile";
 import { getCurrentWorkspace } from "@/lib/workspace/current";
+import { accessFromRow } from "@/lib/workspace/access";
+import { isLocked } from "@/lib/access";
 import { createRealClient } from "@/lib/supabase/real";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { Json } from "@/lib/supabase/database.generated";
@@ -36,6 +38,10 @@ export async function startCall(leadId: string): Promise<StartCallResult> {
   if (!STAFF_ROLES.includes(profile.role)) return { error: "Only staff can place calls." };
 
   const workspace = await getCurrentWorkspace();
+  // Trial over and not approved yet: no dialing (the pages are locked too).
+  if (isLocked(accessFromRow(workspace))) {
+    return { error: "Your free trial has ended. Contact us to continue." };
+  }
   // "A workspace with status suspended can log in but cannot dial."
   if (workspace.status === "suspended") {
     return { error: "This workspace is suspended. Contact support to resume calling." };

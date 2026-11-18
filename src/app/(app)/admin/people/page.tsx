@@ -84,7 +84,7 @@ export default async function PeoplePage() {
         <KeyRound className="h-4 w-4 text-brand-blue" />
         {isUnlimitedSeats(workspace.seat_limit)
           ? `Unlimited agent seats on this workspace: ${agentsUsed} in use.`
-          : `${workspace.plan === "free" ? "Free plan" : "Your plan"}: ${agentsUsed} of ${fmtSeats(workspace.seat_limit)} agent seats used.`}{" "}
+          : `${workspace.plan === "free" ? "Trial plan" : "Your plan"}: ${agentsUsed} of ${fmtSeats(workspace.seat_limit)} agent seats used.`}{" "}
         {isUnlimitedSeats(workspace.data_seat_limit)
           ? `Data-only seats: unlimited, ${dataUsed} in use.`
           : `Data-only seats: ${dataUsed} of ${fmtSeats(workspace.data_seat_limit)} used.`}{" "}
