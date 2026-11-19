@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
 import { loadAgentUsage, loadAudit, loadCompany, loadDailySeries, loadLedger, loadNotes, loadUsers } from "@/lib/owner/data";
 import { fmtDuration, fmtMoney } from "@/lib/owner/status";
 import { fmtDate, fmtDateTime, fmtRelative } from "@/lib/format";
-import { fmtSeats } from "@/lib/plan";
+import { fmtSeats, isUnlimitedSeats } from "@/lib/plan";
+import { quote, quoteLine } from "@/lib/pricing";
 import { PageHeader, Section, Stat } from "../../../_ui/table";
 import { BillingBadge, FlagBadges, StatusBadge, TrialBadge } from "../../../_ui/badges";
 import { SeriesChart } from "../../../_ui/series-chart";
@@ -124,8 +125,8 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             <Stat label="Balance owing" value={fmtMoney(Math.max(0, m.balance), cur)} tone={m.balance > 0 ? (c.billing.kind === "overdue" ? "danger" : "warning") : undefined} hint={m.balance < 0 ? `${fmtMoney(-m.balance, cur)} in credit` : undefined} />
             <Stat label="Paid to date" value={fmtMoney(Number(m.paid_total), cur)} hint={m.last_payment_on ? `Last payment ${fmtDate(m.last_payment_on)}` : "No payments yet"} />
           </div>
-          <Panel title="Billing plan" description="What this company pays you and when. Setting a price above 0 marks the plan as paid.">
-            <BillingPlanForm workspaceId={ws.id} amount={ws.billing_amount === null ? null : Number(ws.billing_amount)} currency={cur} cycle={ws.billing_cycle} nextDueDate={ws.next_due_date} />
+          <Panel title="Billing plan" description={`What this company pays you and when.${isUnlimitedSeats(ws.seat_limit) ? "" : ` List price for its ${ws.seat_limit} agent seats: ${quoteLine(ws.seat_limit)}.`} Setting a price above 0 marks the plan as paid.`}>
+            <BillingPlanForm workspaceId={ws.id} amount={ws.billing_amount === null ? null : Number(ws.billing_amount)} currency={cur} cycle={ws.billing_cycle} nextDueDate={ws.next_due_date} suggested={quote(ws.seat_limit).monthly} />
           </Panel>
           <Panel title="Add to ledger" description="Record an invoice (charge), a payment you received, or a credit. Balance = charges − payments − credits.">
             <LedgerForm workspaceId={ws.id} currency={cur} defaultAmount={ws.billing_amount === null ? null : Number(ws.billing_amount)} />

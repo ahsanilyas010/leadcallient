@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { BrandMark } from "@/components/brand/mark";
 import { BRAND, BILLING } from "@/lib/brand";
+import { PLAN_CARDS, PRICING, basicPriceLine, quote, usd } from "@/lib/pricing";
 import { absoluteUrl, siteUrl } from "@/lib/site";
 import { Reveal } from "@/components/landing/reveal";
 import { SiteHeader, SiteFooter, demoCta } from "@/components/landing/site-chrome";
@@ -87,7 +88,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "How much does it cost to start?",
-    a: `Every workspace starts with a free 14-day trial for ${FREE_AGENT_SEATS} agents, no card needed. Admins, managers, team leads and QA don't use a seat. To keep going after the trial, pay by bank transfer and we approve your company. Call minutes are billed by Zoom to your own Zoom Phone account, not by LeadCallient.`,
+    a: `Every workspace starts with a free 14-day trial for ${FREE_AGENT_SEATS} agents, no card needed. Admins, managers, team leads and QA don't use a seat. After the trial, plans start at ${basicPriceLine()}, with lower per-agent prices as your team grows. Pay by bank transfer and we approve your company. Call minutes are billed by Zoom to your own Zoom Phone account, not by LeadCallient.`,
   },
   {
     q: "Is the demo using real data?",
@@ -498,7 +499,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* Trial and access policy */}
+      {/* Pricing, trial and access policy */}
       <section id="pricing" className="scroll-mt-20 px-4 py-20">
         <div className="mx-auto max-w-5xl">
           <div className="text-center">
@@ -511,7 +512,7 @@ export default async function LandingPage() {
             {[
               { n: "1", t: `${TRIAL_DAYS}-day free trial`, d: `${FREE_AGENT_SEATS} agents, every feature, unlimited admins, managers, team leads and QA. No card needed.` },
               { n: "2", t: "Access pauses when it ends", d: "You get a reminder before the last day. After that your team can't sign in until your company is approved. Nothing is deleted." },
-              { n: "3", t: "Pay, send the receipt, carry on", d: `Pay by bank transfer at the price agreed with our team, send us a screenshot of the payment on WhatsApp (${BILLING.phone}), and we approve your company.` },
+              { n: "3", t: "Pay, send the receipt, carry on", d: `Pay by bank transfer, from ${basicPriceLine()}, send us a screenshot of the payment on WhatsApp (${BILLING.phone}), and we approve your company.` },
             ].map((x) => (
               <div key={x.n} className="rounded-2xl border border-line bg-surface p-6">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-blue text-sm font-semibold text-white">{x.n}</span>
@@ -520,6 +521,20 @@ export default async function LandingPage() {
               </div>
             ))}
           </div>
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {PLAN_CARDS.map((p) => (
+              <div key={p.name} className="rounded-2xl border border-line bg-surface p-6">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-blue">{p.name}</div>
+                <div className="mt-2 font-display text-2xl font-semibold text-ink">{p.price}</div>
+                <div className="mt-1 text-sm font-medium text-ink">{p.agents}</div>
+                <p className="mt-3 text-sm leading-relaxed text-muted">{p.detail}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 text-center text-sm text-muted">
+            Examples: 5 agents {usd(quote(5).monthly!)} · 10 agents {usd(quote(10).monthly!)} · 25 agents {usd(quote(25).monthly!)} a month. Admins, managers, team
+            leads, QA and client logins are free on every plan. Pay yearly and get 12 months for the price of {PRICING.annualMonthsCharged}.
+          </p>
           <p className="mt-6 text-center text-sm text-muted">
             Questions about pricing? Call or WhatsApp{" "}
             <a href={BILLING.whatsappUrl} className="font-semibold text-brand-blue hover:underline">{BILLING.phone}</a>.
@@ -552,7 +567,7 @@ export default async function LandingPage() {
             <div className="relative z-10">
               <h2 className="font-display text-3xl font-semibold sm:text-4xl">Try {FREE_AGENT_SEATS} agents free for {TRIAL_DAYS} days</h2>
               <p className="mx-auto mt-3 max-w-xl text-white/80">
-                Create your workspace in two minutes. Every feature included, no card needed. Keep going after the trial by paying at the price agreed with our team.
+                Create your workspace in two minutes. Every feature included, no card needed. Keep going after the trial from $150 a month for up to 3 agents.
               </p>
               <div className="mt-8 flex flex-wrap justify-center gap-3">
                 <Link

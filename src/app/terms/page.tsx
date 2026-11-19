@@ -30,8 +30,8 @@ export default function TermsPage() {
       <ul>
         <li>
           Every new workspace includes a free 14-day trial for {FREE_AGENT_SEATS} agent seats. When the trial ends, access to the workspace is paused
-          until payment is received and we approve the company; your data is kept and nothing is deleted. Additional agent seats are billed in advance at the
-          price we agree with you, by bank transfer or through our payment provider, Stripe.
+          until payment is received and we approve the company; your data is kept and nothing is deleted. To continue, plans start at US$150 per month for up to 3 agents, which is the minimum plan; agents 4 to 10 are US$40 each per month, agents 11 to 25
+          are US$35 each, and larger teams are priced with us. Fees are paid in advance by bank transfer or through our payment provider, Stripe.
         </li>
         <li>You can change or cancel seats at any time; changes are prorated on the next invoice. Fees already paid are non-refundable except where the law requires.</li>
         <li>Calling runs through your own Zoom Phone account; Zoom bills call minutes and phone numbers to you, not us.</li>

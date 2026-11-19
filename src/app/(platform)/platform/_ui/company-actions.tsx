@@ -176,8 +176,11 @@ export function BillingPlanForm({
   currency,
   cycle,
   nextDueDate,
+  suggested,
 }: {
   workspaceId: string;
+  // Published price for this company's seat count (src/lib/pricing.ts).
+  suggested?: number | null;
   amount: number | null;
   currency: string;
   cycle: string;
@@ -189,7 +192,7 @@ export function BillingPlanForm({
     <div className="flex flex-wrap items-end gap-2">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="price">Price</Label>
-        <Input id="price" type="number" min={0} step="0.01" value={v.amount} placeholder="e.g. 150" onChange={(e) => setV({ ...v, amount: e.target.value })} className="w-32" />
+        <Input id="price" type="number" min={0} step="0.01" value={v.amount} placeholder={suggested ? `List price ${suggested}` : "e.g. 150"} onChange={(e) => setV({ ...v, amount: e.target.value })} className="w-32" />
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="currency">Currency</Label>

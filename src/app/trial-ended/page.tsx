@@ -46,7 +46,7 @@ export default async function TrialEndedPage() {
             call history are safe.
           </p>
           <div className="mt-6">
-            <PayToContinue workspaceName={workspace.name} canPay={isAdmin} />
+            <PayToContinue workspaceName={workspace.name} canPay={isAdmin} agents={workspace.seat_limit} />
           </div>
           <form action={signOut} className="mt-6 border-t border-line pt-4">
             <button type="submit" className="text-sm font-medium text-muted hover:text-ink">
