@@ -1,11 +1,12 @@
 import { MessageCircle, Phone } from "lucide-react";
 import { BILLING } from "@/lib/brand";
+import { quoteLine } from "@/lib/pricing";
 import { bankTransferDetails } from "@/lib/billing/bank-transfer";
 
 // How to keep (or get back) access once the 14-day trial is over: pay by bank
 // transfer, tell us, and we approve the company. Server component: the bank
 // details come from bankTransferDetails() (defaults in src/lib/brand.ts).
-export function PayToContinue({ workspaceName, canPay = true }: { workspaceName: string; canPay?: boolean }) {
+export function PayToContinue({ workspaceName, canPay = true, agents = 3 }: { workspaceName: string; canPay?: boolean; agents?: number }) {
   const bank = bankTransferDetails();
   const btn = "inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition";
   return (
@@ -15,14 +16,14 @@ export function PayToContinue({ workspaceName, canPay = true }: { workspaceName:
           <li className="flex gap-3">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-blue text-xs font-semibold text-white">1</span>
             <span className="text-ink">
-              <span className="font-semibold">Pay by bank transfer</span> to the account below. Use{" "}
+              <span className="font-semibold">Pay {quoteLine(agents)}</span> by bank transfer to the account below. Use{" "}
               <span className="font-semibold">{workspaceName}</span> as the payment reference.
             </span>
           </li>
           <li className="flex gap-3">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-blue text-xs font-semibold text-white">2</span>
             <span className="text-ink">
-              <span className="font-semibold">Send us the receipt</span> on WhatsApp or call {BILLING.phone}, with your workspace name.
+              <span className="font-semibold">Send us a screenshot of the payment</span> on WhatsApp or call {BILLING.phone}, with your workspace name.
             </span>
           </li>
           <li className="flex gap-3">

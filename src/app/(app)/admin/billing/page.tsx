@@ -14,6 +14,7 @@ import { ManageBillingButton, SeatPicker } from "./seat-picker";
 import { ContactCard } from "./contact-card";
 import { accessFromRow } from "@/lib/workspace/access";
 import { PayToContinue } from "@/components/billing/pay-to-continue";
+import { PLAN_CARDS, quoteLine } from "@/lib/pricing";
 import { fmtDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Agents & billing" };
@@ -59,7 +60,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-blue">Keep your access</div>
           <h2 className="mt-2 font-display text-xl font-semibold text-ink">Pay before {fmtDate(trial.endsAt)} to continue without a break</h2>
           <div className="mt-4">
-            <PayToContinue workspaceName={workspace.name} />
+            <PayToContinue workspaceName={workspace.name} agents={Math.max(used, 3)} />
           </div>
         </div>
       )}
@@ -136,6 +137,24 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         ) : (
           <ContactCard workspaceName={workspace.name} />
         )}
+      </div>
+
+      <div className="rounded-3xl bg-white p-6 ring-1 ring-line sm:p-8" data-testid="pricing">
+        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-blue">Pricing</div>
+        <h2 className="mt-2 font-display text-xl font-semibold text-ink">
+          {used > 0 ? `With ${used} agent${used === 1 ? "" : "s"}: ${quoteLine(used)}` : `Plans start at ${quoteLine(3)}`}
+        </h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {PLAN_CARDS.map((p) => (
+            <div key={p.name} className="rounded-2xl bg-canvas p-4 ring-1 ring-line">
+              <div className="text-xs font-semibold uppercase tracking-wide text-brand-blue">{p.name}</div>
+              <div className="mt-1 font-display text-lg font-semibold text-ink">{p.price}</div>
+              <div className="text-xs font-medium text-ink">{p.agents}</div>
+              <p className="mt-2 text-xs text-muted">{p.detail}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-muted">Admins, managers, team leads, QA and client logins are free on every plan.</p>
       </div>
 
       <div id="data-seats" className="rounded-3xl bg-white p-6 ring-1 ring-line sm:p-8" data-testid="data-seats">
