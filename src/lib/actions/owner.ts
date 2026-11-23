@@ -6,6 +6,8 @@ import { requireOwner, type PlatformAdmin } from "@/lib/auth/current-profile";
 import { createServiceClient } from "@/lib/supabase/service";
 import { advanceDueDate } from "@/lib/owner/status";
 import type { RealJson } from "@/lib/supabase/real-types";
+import { accessApprovedEmail, paymentReceivedEmail } from "@/lib/billing/access-emails";
+import { describeAdminEmail, emailWorkspaceAdmins } from "@/lib/billing/send-admin-email";
 
 // Every write the owner console can make. Each one: checks requireOwner(),
 // validates input, writes with the service role (the workspace guard and the
@@ -13,6 +15,8 @@ import type { RealJson } from "@/lib/supabase/real-types";
 
 export interface OwnerResult {
   error?: string;
+  // Extra line for the success toast, e.g. whether the customer was emailed.
+  notice?: string;
 }
 
 // Same lenient id check the rest of the app uses (zod v4's uuid() rejects
@@ -108,9 +112,17 @@ export async function ownerSetApproval(workspaceId: string, approved: boolean): 
   const next = approved ? new Date().toISOString() : null;
   const { error } = await createServiceClient().from("workspaces").update({ access_approved_at: next }).eq("id", workspaceId);
   if (error) return { error: error.message };
-  await audit(owner, approved ? "company.approve" : "company.revoke_approval", workspaceId, { from: ws.access_approved_at, to: next });
+  // Tell the company it is back in (only on a fresh approval, never on a revoke).
+  const mail = approved && !ws.access_approved_at
+    ? await emailWorkspaceAdmins(workspaceId, (a) => accessApprovedEmail({ workspaceName: ws.name, adminName: a.full_name }))
+    : null;
+  await audit(owner, approved ? "company.approve" : "company.revoke_approval", workspaceId, {
+    from: ws.access_approved_at,
+    to: next,
+    ...(mail ? { emailed: mail.sent } : {}),
+  });
   refresh(workspaceId);
-  return {};
+  return mail ? { notice: describeAdminEmail(mail) } : {};
 }
 
 // ---------------------------------------------------------------- seats
@@ -213,9 +225,29 @@ export async function ownerAddLedgerEntry(workspaceId: string, input: z.input<ty
     if (v.advanceDue && ws.next_due_date) update.next_due_date = advanceDueDate(ws.next_due_date, ws.billing_cycle);
     await admin.from("workspaces").update(update).eq("id", workspaceId);
   }
-  await audit(owner, `ledger.${v.kind}`, workspaceId, { amount: v.amount, currency: v.currency, occurred_on: v.occurredOn, method: v.method, reference: v.reference });
+  // A recorded payment is confirmed to the company by email.
+  const mail = v.kind === "payment"
+    ? await emailWorkspaceAdmins(workspaceId, (a) =>
+        paymentReceivedEmail({
+          workspaceName: ws.name,
+          adminName: a.full_name,
+          amount: v.amount,
+          currency: v.currency,
+          reference: v.reference,
+          restored: !ws.access_approved_at,
+        }),
+      )
+    : null;
+  await audit(owner, `ledger.${v.kind}`, workspaceId, {
+    amount: v.amount,
+    currency: v.currency,
+    occurred_on: v.occurredOn,
+    method: v.method,
+    reference: v.reference,
+    ...(mail ? { emailed: mail.sent } : {}),
+  });
   refresh(workspaceId);
-  return {};
+  return mail ? { notice: describeAdminEmail(mail) } : {};
 }
 
 export async function ownerDeleteLedgerEntry(entryId: string): Promise<OwnerResult> {
