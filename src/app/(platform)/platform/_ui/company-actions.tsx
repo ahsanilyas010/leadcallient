@@ -31,7 +31,7 @@ function useOwnerAction() {
       const r = await fn();
       if (r.error) toast.error(r.error);
       else {
-        toast.success(success);
+        toast.success(r.notice ? `${success} ${r.notice}` : success);
         onDone?.();
         router.refresh();
       }

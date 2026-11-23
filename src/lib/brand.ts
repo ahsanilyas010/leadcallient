@@ -52,6 +52,8 @@ export const COMPANY = {
 export const BILLING = {
   phone: "+92 342 2221633",
   whatsappUrl: "https://wa.me/923422221633",
+  // Where replies to billing emails go.
+  replyTo: "hello@assorted.group",
   bank: {
     accountTitle: "Assorted Business Services",
     bankName: "Faysal Bank",
